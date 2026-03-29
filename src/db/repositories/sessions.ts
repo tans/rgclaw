@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { openDb } from "../sqlite";
 
 export type SessionRecord = {
@@ -13,29 +14,37 @@ function databasePath() {
 
 const THIRTY_DAYS_IN_MS = 30 * 24 * 60 * 60 * 1000;
 
-export function createSession(userId: string) {
-  const db = openDb(databasePath());
+function insertSession(db: Database, userId: string) {
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + THIRTY_DAYS_IN_MS).toISOString();
+
+  db.query("insert into sessions (id, user_id, expires_at, created_at) values (?, ?, ?, ?)").run(
+    id,
+    userId,
+    expiresAt,
+    createdAt,
+  );
+
+  return {
+    id,
+    user_id: userId,
+    expires_at: expiresAt,
+    created_at: createdAt,
+  } satisfies SessionRecord;
+}
+
+export function createSession(userId: string, db?: Database) {
+  if (db) {
+    return insertSession(db, userId);
+  }
+
+  const ownedDb = openDb(databasePath());
 
   try {
-    const id = crypto.randomUUID();
-    const createdAt = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + THIRTY_DAYS_IN_MS).toISOString();
-
-    db.query("insert into sessions (id, user_id, expires_at, created_at) values (?, ?, ?, ?)").run(
-      id,
-      userId,
-      expiresAt,
-      createdAt,
-    );
-
-    return {
-      id,
-      user_id: userId,
-      expires_at: expiresAt,
-      created_at: createdAt,
-    } satisfies SessionRecord;
+    return insertSession(ownedDb, userId);
   } finally {
-    db.close();
+    ownedDb.close();
   }
 }
 

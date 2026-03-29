@@ -1,8 +1,21 @@
 import { Hono } from "hono";
 import { setCookie } from "hono/cookie";
+import { openDb } from "../../db/sqlite";
 import { createSession } from "../../db/repositories/sessions";
-import { createUser, findUserByEmail } from "../../db/repositories/users";
+import { createUserWithPasswordHash, findUserByEmail } from "../../db/repositories/users";
 import type { AppEnv } from "../middleware/session";
+
+const SESSION_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
+
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    path: "/",
+    maxAge: SESSION_COOKIE_MAX_AGE,
+    sameSite: "Lax" as const,
+    secure: process.env.NODE_ENV === "production",
+  };
+}
 
 function parseCredentials(body: Record<string, string | File>) {
   const emailField = body.email;
@@ -34,18 +47,26 @@ export function authRoutes() {
     }
 
     try {
-      const user = await createUser(credentials.email, credentials.password);
-      const session = createSession(user.id);
+      const passwordHash = await Bun.password.hash(credentials.password);
+      const db = openDb();
 
-      setCookie(c, "session_id", session.id, {
-        httpOnly: true,
-        path: "/",
-        maxAge: 30 * 24 * 60 * 60,
-      });
+      try {
+        const registerUser = db.transaction((email: string, hashedPassword: string) => {
+          const user = createUserWithPasswordHash(db, email, hashedPassword);
+          const session = createSession(user.id, db);
+
+          return { session };
+        });
+
+        const { session } = registerUser(credentials.email, passwordHash);
+        setCookie(c, "session_id", session.id, sessionCookieOptions());
+      } finally {
+        db.close();
+      }
 
       return c.redirect("/me", 302);
     } catch {
-      return c.text("register failed", 400);
+      return c.text("register failed", 500);
     }
   });
 
@@ -68,11 +89,7 @@ export function authRoutes() {
     }
 
     const session = createSession(user.id);
-    setCookie(c, "session_id", session.id, {
-      httpOnly: true,
-      path: "/",
-      maxAge: 30 * 24 * 60 * 60,
-    });
+    setCookie(c, "session_id", session.id, sessionCookieOptions());
 
     return c.redirect("/me", 302);
   });

@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { openDb } from "../sqlite";
 
 export type UserRecord = {
@@ -12,25 +13,29 @@ function databasePath() {
   return process.env.DATABASE_PATH ?? "./data/app.sqlite";
 }
 
+export function createUserWithPasswordHash(db: Database, email: string, passwordHash: string) {
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+
+  db.query(
+    "insert into users (id, email, password_hash, created_at, updated_at) values (?, ?, ?, ?, ?)",
+  ).run(id, email, passwordHash, now, now);
+
+  return {
+    id,
+    email,
+    password_hash: passwordHash,
+    created_at: now,
+    updated_at: now,
+  } satisfies UserRecord;
+}
+
 export async function createUser(email: string, password: string) {
   const db = openDb(databasePath());
 
   try {
-    const now = new Date().toISOString();
-    const id = crypto.randomUUID();
     const passwordHash = await Bun.password.hash(password);
-
-    db.query(
-      "insert into users (id, email, password_hash, created_at, updated_at) values (?, ?, ?, ?, ?)",
-    ).run(id, email, passwordHash, now, now);
-
-    return {
-      id,
-      email,
-      password_hash: passwordHash,
-      created_at: now,
-      updated_at: now,
-    } satisfies UserRecord;
+    return createUserWithPasswordHash(db, email, passwordHash);
   } finally {
     db.close();
   }
