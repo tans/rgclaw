@@ -1,4 +1,7 @@
+import { runMigrations } from "../db/migrate";
 import { createApp } from "./app";
+
+runMigrations(process.env.DATABASE_PATH);
 
 const app = createApp();
 
