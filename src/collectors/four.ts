@@ -1,6 +1,20 @@
+import type { CollectorClient } from "./client";
+import {
+  getLogsInBatches,
+  parseAddressWord,
+  resolveEventTime,
+  resolveTokenSymbol,
+  toLogIndex,
+} from "./rpc";
+
+export const FOUR_CONTRACT_ADDRESS = "0x5c952063c7fc8610ffdb798152d69f0b9550762b";
+export const FOUR_TOKEN_CREATE_TOPIC =
+  "0x7db52723a3b2cdd6164364b3b766e65e540d7be48ffa89582956d8eaebe62942";
+
 export type FourLaunchLog = {
   transactionHash: string;
   logIndex: number;
+  eventTime?: string;
   args: {
     memeToken?: string;
     token?: string;
@@ -18,9 +32,42 @@ export function normalizeFourEvent(log: FourLaunchLog) {
     tokenAddress,
     symbol,
     title: `${symbol ?? tokenAddress} 发射`,
-    eventTime: new Date().toISOString(),
+    eventTime: log.eventTime ?? new Date().toISOString(),
     chain: "bsc",
     rawPayload: JSON.stringify(log),
     dedupeKey: `four:${log.transactionHash}:${log.logIndex}`,
   };
+}
+
+export async function collectFourLaunchEvents(
+  client: Pick<CollectorClient, "getLogs" | "getBlock" | "readContract">,
+  fromBlock: bigint,
+  toBlock: bigint,
+  batchSize = 50n,
+) {
+  const logs = await getLogsInBatches(client, {
+    address: FOUR_CONTRACT_ADDRESS,
+    topics: [FOUR_TOKEN_CREATE_TOPIC],
+    fromBlock,
+    toBlock,
+    batchSize,
+  });
+
+  return Promise.all(
+    logs.map(async (log) => {
+      const tokenAddress = log.args?.memeToken ?? log.args?.token ?? parseAddressWord(log.data, 0);
+      const symbol = await resolveTokenSymbol(client, tokenAddress);
+      const eventTime = await resolveEventTime(client, log);
+
+      return normalizeFourEvent({
+        transactionHash: log.transactionHash,
+        logIndex: toLogIndex(log.logIndex),
+        eventTime,
+        args: {
+          memeToken: tokenAddress,
+          symbol: symbol ?? undefined,
+        },
+      });
+    }),
+  );
 }
