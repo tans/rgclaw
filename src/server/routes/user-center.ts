@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { buildBindInstruction } from "../../adapters/wechat-bot";
 import { openDb } from "../../db/sqlite";
 import { getActiveEntitlement } from "../../db/repositories/entitlements";
 import {
@@ -6,6 +7,7 @@ import {
   listSubscriptions,
   upsertWalletAddress,
 } from "../../db/repositories/subscriptions";
+import { ensureBindCode, getBindingByUserId } from "../../db/repositories/wechat-bindings";
 import type { AppEnv } from "../middleware/session";
 import { renderUserCenter } from "../views/user-center";
 
@@ -24,6 +26,7 @@ export function userCenterRoutes() {
     }
 
     ensureDefaultSubscriptions(userId);
+    const bindRecord = ensureBindCode(userId);
 
     const db = openDb();
 
@@ -33,13 +36,18 @@ export function userCenterRoutes() {
         .get(userId) as UserCenterUserRecord | null;
       const entitlement = getActiveEntitlement(userId);
       const subscriptions = listSubscriptions(userId);
+      const binding = getBindingByUserId(userId);
 
       return c.html(
         renderUserCenter({
           email: user?.email ?? "",
           walletAddress: user?.wallet_address ?? "",
           subscriptions,
-          entitlementText: entitlement?.expires_at ?? "暂无",
+          entitlementText: entitlement
+            ? `${entitlement.expires_at}（${entitlement.plan_type === "trial" ? "3 天试用" : "付费"}）`
+            : "暂无",
+          bindingStatusText: binding?.bind_status === "bound" ? "已绑定" : "未绑定",
+          bindInstruction: buildBindInstruction(bindRecord.bind_code),
         }),
       );
     } finally {

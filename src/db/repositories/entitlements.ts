@@ -20,3 +20,37 @@ export function getActiveEntitlement(userId: string) {
     db.close();
   }
 }
+
+export function ensureTrialEntitlement(userId: string) {
+  const db = openDb();
+
+  try {
+    const existing = db
+      .query("select id from user_entitlements where user_id = ? and plan_type = 'trial' limit 1")
+      .get(userId) as { id: string } | null;
+
+    if (existing) {
+      return;
+    }
+
+    const now = new Date();
+    const startsAt = now.toISOString();
+    const expiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    db.query(
+      "insert into user_entitlements (id, user_id, plan_type, status, starts_at, expires_at, source, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(
+      crypto.randomUUID(),
+      userId,
+      "trial",
+      "active",
+      startsAt,
+      expiresAt,
+      "trial_signup",
+      startsAt,
+      startsAt,
+    );
+  } finally {
+    db.close();
+  }
+}
