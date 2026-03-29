@@ -66,10 +66,10 @@ Recommended architecture:
 
 1. `collector-four`
 2. `collector-flap`
-3. `web-app`
+3. `hono-app`
 4. `push-worker`
 5. `wechat-bot-adapter`
-6. `postgres`
+6. `sqlite`
 
 Rationale:
 
@@ -77,7 +77,7 @@ Rationale:
 - Cleaner separation than putting collection, web traffic, and push delivery into one process
 - Leaves a clear extension point for future Twitter/X collectors without redesigning the core model
 
-The Phase 1 implementation should not introduce a dedicated MQ. Database tables will serve as the lightweight storage and job coordination layer.
+The Phase 1 implementation should not introduce a dedicated MQ. SQLite tables will serve as the lightweight storage and job coordination layer. The server runtime should be based on Bun, with Hono handling HTTP routes and page delivery.
 
 ## 4. Core Components
 
@@ -102,7 +102,7 @@ Responsibilities:
 - Normalize incoming payloads
 - Insert launch events into the database
 
-### 4.3 `web-app`
+### 4.3 `hono-app`
 
 Responsibilities:
 
@@ -112,6 +112,12 @@ Responsibilities:
 - Let users bind WeChat
 - Let users manage source subscriptions
 - Show renewal instructions and payment status
+
+Implementation note:
+
+- Use Hono as the HTTP server layer
+- Keep Phase 1 delivery simple: Hono may serve server-rendered HTML, template pages, or a minimal static frontend plus APIs
+- Avoid introducing a separate heavyweight frontend framework unless later phases actually require it
 
 ### 4.4 `push-worker`
 
@@ -506,21 +512,24 @@ Shows:
 
 Recommended stack:
 
+- Bun as the runtime and package manager
 - TypeScript across the whole project
-- Next.js for the web app and basic API surface
-- PostgreSQL for persistence
-- Prisma or an equivalent ORM for migrations and schema access
+- Hono for the HTTP server, page routes, and API surface
+- SQLite for persistence
+- a lightweight SQLite access layer suitable for Bun, avoiding a heavy ORM unless clearly needed
 - `viem` for event watching
 - `weixin-agent-sdk` isolated behind `wechat-bot-adapter`
 
 Recommended logical project structure:
 
-- `apps/web`
-- `apps/collector`
-- `apps/worker`
-- `packages/shared`
+- `src/server`
+- `src/collectors`
+- `src/workers`
+- `src/adapters`
+- `src/db`
+- `src/shared`
 
-This keeps deployment lightweight while preserving code boundaries.
+This keeps deployment lightweight while preserving code boundaries. Phase 1 should prefer one Bun-based service codebase with a small number of long-running processes over a multi-framework stack.
 
 ## 12. Verification Targets
 
