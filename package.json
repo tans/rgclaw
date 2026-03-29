@@ -1,0 +1,19 @@
+{
+  "name": "rgclaw",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/server/index.ts",
+    "test": "bun test",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "collector": "bun run src/collectors/run.ts",
+    "worker": "bun run src/workers/run.ts"
+  },
+  "dependencies": {
+    "hono": "^4.12.9"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.8.2"
+  }
+}
