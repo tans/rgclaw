@@ -1,12 +1,30 @@
 import { config } from "../shared/config";
 import { runMigrations } from "../db/migrate";
 import { insertLaunchEvent } from "../db/repositories/launch-events";
+import { runPollingLoop } from "../shared/polling-loop";
 import { createBscRpcClient } from "./rpc";
 import { collectFlapLaunchEvents } from "./flap";
 import { collectFourLaunchEvents } from "./four";
 
-export async function runCollectorOnce() {
+const COLLECTOR_POLL_DELAY_MS = 30_000;
+
+type CollectorLoopOptions = {
+  delayMs?: number;
+  bootPrep?: () => Promise<void>;
+  logger?: {
+    info(message: string): void;
+    error(message: string, error: unknown): void;
+  };
+  runOnce?: () => Promise<number>;
+  shouldContinue?: () => boolean;
+  sleep?: (delayMs: number) => Promise<void>;
+};
+
+async function runCollectorBootPrep() {
   runMigrations(config.databasePath);
+}
+
+async function runCollectorIteration() {
   const client = createBscRpcClient(config.bscRpcUrl);
   const latestBlock = await client.getBlockNumber();
   const lookbackBlocks = BigInt(Math.max(config.collectorLookbackBlocks, 1));
@@ -27,13 +45,40 @@ export async function runCollectorOnce() {
   return events.length;
 }
 
-async function boot() {
-  console.log("collector boot");
-  const count = await runCollectorOnce();
-  console.log(`collector inserted ${count} launch events`);
+export async function runCollectorOnce() {
+  await runCollectorBootPrep();
+  return runCollectorIteration();
 }
 
-boot().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+export async function runCollectorLoop({
+  delayMs = COLLECTOR_POLL_DELAY_MS,
+  bootPrep = runCollectorBootPrep,
+  logger,
+  runOnce = runCollectorIteration,
+  shouldContinue,
+  sleep,
+}: CollectorLoopOptions = {}) {
+  await bootPrep();
+  await runPollingLoop({
+    delayMs,
+    logger,
+    onErrorMessage: "collector iteration failed",
+    onSuccess: async () => {
+      // Intentionally logged in runOnce wrapper below.
+    },
+    runOnce: async () => {
+      const count = await runOnce();
+      (logger ?? console).info(`collector inserted ${count} launch events`);
+    },
+    shouldContinue,
+    sleep,
+    startMessage: "collector boot",
+  });
+}
+
+if (import.meta.main) {
+  runCollectorLoop().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
