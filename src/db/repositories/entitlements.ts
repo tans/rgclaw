@@ -54,3 +54,18 @@ export function ensureTrialEntitlement(userId: string) {
     db.close();
   }
 }
+
+export function markReminderSent(entitlementId: string) {
+  const db = openDb();
+
+  try {
+    const now = new Date().toISOString();
+    db.query("update user_entitlements set renewal_reminded_at = ?, updated_at = ? where id = ?").run(
+      now,
+      now,
+      entitlementId,
+    );
+  } finally {
+    db.close();
+  }
+}
