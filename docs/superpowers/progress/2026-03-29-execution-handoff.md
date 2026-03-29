@@ -4,7 +4,7 @@
 
 - Task 1 已完成，并通过 spec review 与 code quality review。
 - Task 2 已完成，并通过 spec review 与 code quality review。
-- Task 3 已完成实现与 spec review，但 **尚未通过 code quality review**，不能视为真正完成。
+- Task 3 已完成，并通过 spec review 与 code quality review。
 - Task 4 及之后尚未开始实施。
 
 ## 相关文档
@@ -22,6 +22,8 @@
 - `37c5acc` `fix: harden sqlite migration bootstrap`
 - `b7c2e1d` `fix: make sqlite migrations atomic`
 - `fe13fc7` `feat: add email auth and session flow`
+- `278e29b` `chore: ignore local worktrees`
+- `f7e8f38` `fix: harden auth session flow`
 
 ## Task 1 状态
 
@@ -64,11 +66,12 @@
 
 ## Task 3 状态
 
-实现已提交，但 **review 未过**。
+已完成。
 
-当前实现提交：
+完成内容：
 
 - `fe13fc7` `feat: add email auth and session flow`
+- `f7e8f38` `fix: harden auth session flow`
 
 当前实现文件：
 
@@ -83,75 +86,31 @@
 当前验证结果：
 
 - `bun test tests/server/auth.test.ts` 通过
+- `bun test` 通过
 
-### Task 3 已通过项
+### Task 3 已完成项
 
 - spec review: 通过
-- happy path 注册/登录测试：通过
-
-### Task 3 阻塞问题
-
-来自 code quality review 的未解决问题：
-
-1. 注册流程不是原子操作
-   [src/server/routes/auth.ts](/Users/ke/code/rgclaw/src/server/routes/auth.ts)
-   [src/db/repositories/users.ts](/Users/ke/code/rgclaw/src/db/repositories/users.ts)
-   [src/db/repositories/sessions.ts](/Users/ke/code/rgclaw/src/db/repositories/sessions.ts)
-
-   当前 `/register` 先创建用户，再创建 session，两步走独立连接。
-   如果第二步失败，会留下“用户已创建但前端看到注册失败”的半成功状态。
-   这会让后续重试撞唯一索引，而且当前实现会把异常吞成 `400 register failed`。
-
-2. Session cookie 防护基线不足
-   [src/server/routes/auth.ts](/Users/ke/code/rgclaw/src/server/routes/auth.ts)
-
-   当前 cookie 只设置了：
-   - `HttpOnly`
-   - `Path`
-   - `Max-Age`
-
-   缺少：
-   - `SameSite`
-   - 按环境控制的 `Secure`
-
-3. 测试覆盖不足
-   [tests/server/auth.test.ts](/Users/ke/code/rgclaw/tests/server/auth.test.ts)
-   [src/server/middleware/session.ts](/Users/ke/code/rgclaw/src/server/middleware/session.ts)
-   [src/server/app.ts](/Users/ke/code/rgclaw/src/server/app.ts)
-
-   当前只覆盖了 happy path。
-   尚未覆盖：
-   - `/me` 的访问控制
-   - 无效凭证登录
-   - 伪造或过期 session
-   - cookie 属性契约
+- code quality review: 通过
+- 注册流程事务化，避免 session 创建失败留下半成功用户
+- session cookie 补齐 `SameSite=Lax`，并在生产环境下启用 `Secure`
+- 补齐 `/me` 访问控制、无效登录、伪造或过期 session、cookie 属性、注册原子性测试
 
 ## 下一位接手的建议顺序
 
-1. 先修 Task 3 的注册原子性
-   建议把“创建用户 + 创建 session”收敛到一个事务里，不要继续分散在两个独立写操作中。
+1. 开始 Task 4：公开首页事件流
+   先补 `tests/server/home-feed.test.ts` 失败测试，再实现 `launch-events repository + home view + app route wiring`。
 
-2. 修 Task 3 的 cookie 策略
-   最低建议补：
-   - `sameSite: "Lax"`
-   - 生产环境下 `secure: true`
+2. Task 4 完成后开始 Task 5：用户中心中的钱包地址与来源订阅
+   前提是保持 Task 4 独立提交，不把用户中心逻辑提前混入首页事件流任务。
 
-3. 补 Task 3 测试
-   至少覆盖：
-   - 未登录访问 `/me` 会被重定向
-   - 登录失败返回 401
-   - 伪造或过期 `session_id` 不会被识别为有效登录
-   - `set-cookie` 包含预期安全属性
-
-4. Task 3 修完后重新走两轮 review
-   - spec review
-   - code quality review
-
-5. Task 3 真正通过后，再开始 Task 4
-   Task 4 是公开首页事件流，不建议跳过 Task 3 的 review 问题直接继续。
+3. 继续沿用当前执行纪律
+   每个 Task 保持 TDD、独立提交、spec review、code quality review，再进入下一个 Task。
 
 ## 建议复跑命令
 
+- `bun test`
+- `bun test tests/server/home-feed.test.ts`
 - `bun test tests/server/auth.test.ts`
 - `bun test tests/db/migrate.test.ts`
 - `git log --oneline -8`
@@ -159,12 +118,13 @@
 
 ## 当前工作区状态
 
-截至这份交接记录写入时：
+截至这次更新：
 
 - 未跟踪目录：
   - `demo/`
   - `node_modules/`
-- 没有已知的已跟踪文件脏改动
+- `.worktrees/` 已被 `.gitignore` 忽略
+- 当前 `main` 工作区干净，无已跟踪文件脏改动
 
 ## 备注
 
