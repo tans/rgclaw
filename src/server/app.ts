@@ -3,6 +3,7 @@ import { runMigrations } from "../db/migrate";
 import { listLatestLaunchEvents } from "../db/repositories/launch-events";
 import { sessionMiddleware, type AppEnv } from "./middleware/session";
 import { authRoutes } from "./routes/auth";
+import { renewalRoutes } from "./routes/renewal";
 import { userCenterRoutes } from "./routes/user-center";
 import { wechatRoutes } from "./routes/wechat";
 import { renderHomePage } from "./views/home";
@@ -19,6 +20,7 @@ export function createApp() {
 
   app.route("/", authRoutes());
   app.route("/", userCenterRoutes());
+  app.route("/", renewalRoutes());
   app.route("/", wechatRoutes());
 
   return app;
