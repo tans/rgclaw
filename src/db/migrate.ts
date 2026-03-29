@@ -1,15 +1,27 @@
 import { readFileSync } from "node:fs";
 import { openDb } from "./sqlite";
 
-const migrations = [
+type Migration = {
+  id: string;
+  sql: string;
+};
+
+type RunMigrationsOptions = {
+  migrations?: Migration[];
+  beforeRecordMigration?: (migrationId: string) => void;
+};
+
+const defaultMigrations: Migration[] = [
   {
     id: "0001_initial_schema",
     sql: readFileSync(new URL("./schema.sql", import.meta.url), "utf8"),
   },
 ];
 
-export function runMigrations(path?: string) {
+export function runMigrations(path?: string, options: RunMigrationsOptions = {}) {
   const db = openDb(path);
+  const migrations = options.migrations ?? defaultMigrations;
+
   db.exec(`
     create table if not exists _migrations (
       id text primary key,
@@ -26,11 +38,14 @@ export function runMigrations(path?: string) {
       continue;
     }
 
-    db.exec(migration.sql);
-    db.query("insert into _migrations (id, executed_at) values (?, ?)").run(
-      migration.id,
-      new Date().toISOString(),
-    );
+    db.transaction((entry: Migration) => {
+      db.exec(entry.sql);
+      options.beforeRecordMigration?.(entry.id);
+      db.query("insert into _migrations (id, executed_at) values (?, ?)").run(
+        entry.id,
+        new Date().toISOString(),
+      );
+    })(migration);
   }
 }
 

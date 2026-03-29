@@ -68,4 +68,33 @@ describe("runMigrations", () => {
 
     expect(row.count).toBe(1);
   });
+
+  test("migration 在记账前失败时会整体回滚", () => {
+    const migrationId = "0002_atomicity_test";
+
+    expect(() =>
+      runMigrations(testDbPath, {
+        migrations: [
+          {
+            id: migrationId,
+            sql: "create table tx_atomicity_probe (id text primary key);",
+          },
+        ],
+        beforeRecordMigration: () => {
+          throw new Error("before record failed");
+        },
+      }),
+    ).toThrow("before record failed");
+
+    const db = openDb(testDbPath);
+    const createdTable = db
+      .query("select name from sqlite_master where type = 'table' and name = 'tx_atomicity_probe'")
+      .get() as { name: string } | null;
+    const migrationRecord = db
+      .query("select count(*) as count from _migrations where id = ?")
+      .get(migrationId) as { count: number };
+
+    expect(createdTable).toBeNull();
+    expect(migrationRecord.count).toBe(0);
+  });
 });
