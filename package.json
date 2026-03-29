@@ -10,7 +10,7 @@
     "worker": "bun run src/workers/run.ts"
   },
   "dependencies": {
-    "hono": "^4.12.9"
+    "hono": "^4.7.2"
   },
   "devDependencies": {
     "@types/bun": "latest",
