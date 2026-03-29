@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { runMigrations } from "../db/migrate";
+import { listLatestLaunchEvents } from "../db/repositories/launch-events";
 import { sessionMiddleware, type AppEnv } from "./middleware/session";
 import { authRoutes } from "./routes/auth";
+import { renderHomePage } from "./views/home";
 
 export function createApp() {
   runMigrations(process.env.DATABASE_PATH);
@@ -10,9 +12,7 @@ export function createApp() {
   app.use("*", sessionMiddleware);
 
   app.get("/", (ctx) => {
-    return ctx.html(
-      `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>公开首页</title></head><body><main><h1>最新发射事件</h1></main></body></html>`
-    );
+    return ctx.html(renderHomePage(listLatestLaunchEvents()));
   });
 
   app.route("/", authRoutes());
