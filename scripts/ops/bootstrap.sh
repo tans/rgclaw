@@ -21,7 +21,7 @@ fi
 
 mkdir -p logs
 bun install
-pm2 start ecosystem.config.cjs
+pm2 start ecosystem.config.json
 pm2 save
 
 echo "bootstrap complete"

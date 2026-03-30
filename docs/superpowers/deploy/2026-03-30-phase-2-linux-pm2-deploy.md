@@ -24,6 +24,13 @@ cp .env.example .env
 bash scripts/ops/bootstrap.sh
 ```
 
+如果需要手动启动，直接执行：
+
+```bash
+mkdir -p logs
+pm2 start ecosystem.config.json
+```
+
 5. 配置开机自启。
 先执行：
 

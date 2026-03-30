@@ -75,7 +75,7 @@
 
 ## `pm2` 配置设计
 
-新增仓库根目录 `ecosystem.config.cjs`。
+新增仓库根目录 `ecosystem.config.json`。
 
 要求：
 
@@ -103,7 +103,7 @@
    作用：
    - 安装依赖
    - 准备日志目录
-   - 用 `pm2 ecosystem.config.cjs` 首次启动应用
+   - 用 `pm2 ecosystem.config.json` 首次启动应用
    - 输出后续常用命令提示
 
 2. `restart.sh`
@@ -211,7 +211,7 @@
 2. `bash scripts/ops/healthcheck.sh`
    在本地或目标环境验证脚本逻辑
 
-3. `pm2 start ecosystem.config.cjs`
+3. `pm2 start ecosystem.config.json`
    验证 `pm2` 配置能拉起 3 个 app
 
 4. 通过 Nginx 访问首页
@@ -222,7 +222,7 @@
 本阶段完成后，仓库应新增：
 
 - `.env.example`
-- `ecosystem.config.cjs`
+- `ecosystem.config.json`
 - `scripts/ops/bootstrap.sh`
 - `scripts/ops/restart.sh`
 - `scripts/ops/status.sh`

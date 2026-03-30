@@ -1,0 +1,46 @@
+{
+  "apps": [
+    {
+      "name": "rgclaw-web",
+      "cwd": ".",
+      "script": "src/server/index.ts",
+      "interpreter": "bun",
+      "interpreterArgs": "run",
+      "env_file": ".env",
+      "autorestart": true,
+      "watch": false,
+      "merge_logs": true,
+      "time": true,
+      "out_file": "logs/rgclaw-web.out.log",
+      "error_file": "logs/rgclaw-web.err.log"
+    },
+    {
+      "name": "rgclaw-collector",
+      "cwd": ".",
+      "script": "src/collectors/run.ts",
+      "interpreter": "bun",
+      "interpreterArgs": "run",
+      "env_file": ".env",
+      "autorestart": true,
+      "watch": false,
+      "merge_logs": true,
+      "time": true,
+      "out_file": "logs/rgclaw-collector.out.log",
+      "error_file": "logs/rgclaw-collector.err.log"
+    },
+    {
+      "name": "rgclaw-worker",
+      "cwd": ".",
+      "script": "src/workers/run.ts",
+      "interpreter": "bun",
+      "interpreterArgs": "run",
+      "env_file": ".env",
+      "autorestart": true,
+      "watch": false,
+      "merge_logs": true,
+      "time": true,
+      "out_file": "logs/rgclaw-worker.out.log",
+      "error_file": "logs/rgclaw-worker.err.log"
+    }
+  ]
+}

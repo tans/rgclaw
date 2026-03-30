@@ -14,7 +14,7 @@
 
 - Create: `.env.example`
   环境变量模板，列出现有运行所需变量和未来真实接入的预留变量。
-- Create: `ecosystem.config.cjs`
+- Create: `ecosystem.config.json`
   `pm2` 进程编排配置，统一声明 `web`、`collector`、`worker`。
 - Create: `scripts/ops/bootstrap.sh`
   首发部署与首次启动脚本。
@@ -33,7 +33,7 @@
 
 **Files:**
 - Create: `.env.example`
-- Create: `ecosystem.config.cjs`
+- Create: `ecosystem.config.json`
 
 - [ ] **Step 1: 写配置文件存在性失败测试**
 
@@ -41,7 +41,7 @@
 
 ```bash
 test -f .env.example
-test -f ecosystem.config.cjs
+test -f ecosystem.config.json
 ```
 
 - [ ] **Step 2: 运行检查确认失败**
@@ -49,7 +49,7 @@ test -f ecosystem.config.cjs
 Run:
 
 ```bash
-test -f .env.example && test -f ecosystem.config.cjs
+test -f .env.example && test -f ecosystem.config.json
 ```
 
 Expected: FAIL，至少一个文件不存在
@@ -79,7 +79,7 @@ PAYMENT_CONFIRMATIONS=3
 
 - [ ] **Step 4: 写最小 `pm2 ecosystem` 配置**
 
-`ecosystem.config.cjs`
+`ecosystem.config.json`
 
 ```js
 const path = require("node:path");
@@ -120,7 +120,7 @@ module.exports = {
 Run:
 
 ```bash
-test -f .env.example && test -f ecosystem.config.cjs
+test -f .env.example && test -f ecosystem.config.json
 ```
 
 Expected: PASS，无输出
@@ -128,7 +128,7 @@ Expected: PASS，无输出
 - [ ] **Step 6: 提交**
 
 ```bash
-git add .env.example ecosystem.config.cjs
+git add .env.example ecosystem.config.json
 git commit -m "chore: add pm2 environment and process config"
 ```
 
@@ -178,7 +178,7 @@ fi
 
 mkdir -p logs
 bun install
-pm2 start ecosystem.config.cjs
+pm2 start ecosystem.config.json
 
 echo "bootstrap complete"
 echo "use: pm2 status"
@@ -393,7 +393,7 @@ git commit -m "docs: add linux pm2 deployment guide"
 
 **Files:**
 - Verify: `.env.example`
-- Verify: `ecosystem.config.cjs`
+- Verify: `ecosystem.config.json`
 - Verify: `scripts/ops/bootstrap.sh`
 - Verify: `scripts/ops/restart.sh`
 - Verify: `scripts/ops/status.sh`
@@ -415,7 +415,7 @@ Expected: PASS，输出包含 `0 fail`
 Run:
 
 ```bash
-node -e "const cfg = require('./ecosystem.config.cjs'); if (!cfg.apps || cfg.apps.length !== 3) throw new Error('invalid ecosystem'); console.log(cfg.apps.map(app => app.name).join(','));"
+node -e "const fs = require('node:fs'); const cfg = JSON.parse(fs.readFileSync('./ecosystem.config.json', 'utf8')); if (!cfg.apps || cfg.apps.length !== 3) throw new Error('invalid ecosystem'); console.log(cfg.apps.map(app => app.name).join(','));"
 ```
 
 Expected: PASS，输出 `rgclaw-web,rgclaw-collector,rgclaw-worker`
@@ -433,7 +433,7 @@ Expected: PASS，无输出
 - [ ] **Step 4: 提交**
 
 ```bash
-git add .env.example ecosystem.config.cjs scripts/ops/bootstrap.sh scripts/ops/restart.sh scripts/ops/status.sh scripts/ops/healthcheck.sh docs/superpowers/deploy/2026-03-30-phase-2-linux-pm2-deploy.md
+git add .env.example ecosystem.config.json scripts/ops/bootstrap.sh scripts/ops/restart.sh scripts/ops/status.sh scripts/ops/healthcheck.sh docs/superpowers/deploy/2026-03-30-phase-2-linux-pm2-deploy.md
 git commit -m "chore: add phase 2 ops and deploy assets"
 ```
 
@@ -459,4 +459,4 @@ git commit -m "chore: add phase 2 ops and deploy assets"
 
 - `pm2` app 名称统一为 `rgclaw-web`、`rgclaw-collector`、`rgclaw-worker`
 - 环境变量命名与现有代码中的 `config` 保持一致
-- 文档与脚本都以 `scripts/ops/` 和 `ecosystem.config.cjs` 为统一入口
+- 文档与脚本都以 `scripts/ops/` 和 `ecosystem.config.json` 为统一入口
