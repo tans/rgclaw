@@ -34,10 +34,20 @@ type UserConfig struct {
 	IlinkUserID   string `json:"ilink_user_id"`
 	ContextToken  string `json:"context_token"`
 	APIToken      string `json:"api_token"`
+	LastTargetUserID string `json:"last_target_user_id"`
+	LastContextToken string `json:"last_context_token"`
 }
 
 type AppConfig struct {
 	Bots map[string]*UserConfig `json:"bots"`
+}
+
+type sendMessageFunc func(*UserConfig, string, string, string) error
+
+type botAPIHandlerDeps struct {
+	cfg          *AppConfig
+	sendMessage  sendMessageFunc
+	internalToken string
 }
 
 var (
@@ -130,7 +140,7 @@ func bearerToken(r *http.Request) string {
 	return ""
 }
 
-func requestAuthorized(user *UserConfig, r *http.Request, jsonBody map[string]interface{}) bool {
+func requestAuthorized(user *UserConfig, r *http.Request, jsonBody map[string]interface{}, internalToken string) bool {
 	token := bearerToken(r)
 	if token == "" {
 		token = getReqParam(r, "token", jsonBody)
@@ -138,10 +148,17 @@ func requestAuthorized(user *UserConfig, r *http.Request, jsonBody map[string]in
 	if token == "" {
 		return false
 	}
-	if internalAPIToken != "" && token == internalAPIToken {
+	if internalToken != "" && token == internalToken {
 		return true
 	}
 	return token == user.APIToken
+}
+
+func fallbackTargetContext(user *UserConfig) (string, string) {
+	if user.LastTargetUserID != "" && user.LastContextToken != "" {
+		return user.LastTargetUserID, user.LastContextToken
+	}
+	return user.IlinkUserID, user.ContextToken
 }
 
 func getReqParam(r *http.Request, key string, jsonBody map[string]interface{}) string {
@@ -151,7 +168,7 @@ func getReqParam(r *http.Request, key string, jsonBody map[string]interface{}) s
 	return r.FormValue(key)
 }
 
-func buildBotAPIHandler() http.Handler {
+func newBotAPIHandler(deps botAPIHandlerDeps) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/bots/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/bots/")
@@ -177,14 +194,14 @@ func buildBotAPIHandler() http.Handler {
 		}
 
 		configLock.Lock()
-		user, exists := cfg.Bots[botID]
+		user, exists := deps.cfg.Bots[botID]
 		configLock.Unlock()
 
 		if !exists {
 			sendJSON(w, http.StatusNotFound, map[string]interface{}{"code": 404, "error": "Bot not found"})
 			return
 		}
-		if !requestAuthorized(user, r, jsonBody) {
+		if !requestAuthorized(user, r, jsonBody, deps.internalToken) {
 			sendJSON(w, http.StatusUnauthorized, map[string]interface{}{"code": 401, "error": "Unauthorized"})
 			return
 		}
@@ -198,17 +215,18 @@ func buildBotAPIHandler() http.Handler {
 				sendJSON(w, http.StatusBadRequest, map[string]interface{}{"code": 400, "error": "Missing text"})
 				return
 			}
+			defaultTarget, defaultContext := fallbackTargetContext(user)
 			if toUserID == "" {
-				toUserID = user.IlinkUserID
+				toUserID = defaultTarget
 			}
 			if contextToken == "" {
-				contextToken = user.ContextToken
+				contextToken = defaultContext
 			}
 			if toUserID == "" || contextToken == "" {
 				sendJSON(w, http.StatusBadRequest, map[string]interface{}{"code": 400, "error": "Context not ready"})
 				return
 			}
-			if err := sendMessageFn(user, toUserID, text, contextToken); err != nil {
+			if err := deps.sendMessage(user, toUserID, text, contextToken); err != nil {
 				sendJSON(w, http.StatusInternalServerError, map[string]interface{}{"code": 500, "error": err.Error()})
 				return
 			}
@@ -230,6 +248,14 @@ func buildBotAPIHandler() http.Handler {
 		}
 	})
 	return mux
+}
+
+func buildBotAPIHandler() http.Handler {
+	return newBotAPIHandler(botAPIHandlerDeps{
+		cfg:           &cfg,
+		sendMessage:   sendMessageFn,
+		internalToken: internalAPIToken,
+	})
 }
 
 func startAPIServer(port int) {
@@ -489,6 +515,8 @@ func monitorWeixin(user *UserConfig) {
 				configLock.Lock()
 				if msg.ContextToken != "" {
 					user.ContextToken = msg.ContextToken
+					user.LastTargetUserID = msg.FromUserID
+					user.LastContextToken = msg.ContextToken
 				}
 				configLock.Unlock()
 				saveConfig()
