@@ -7,7 +7,7 @@ cd "$ROOT_DIR"
 pm2 status
 echo
 echo "Log hints:"
-echo "  pm2 logs rgclaw-web"
-echo "  pm2 logs rgclaw-collector"
-echo "  pm2 logs rgclaw-worker"
+echo "  pm2 restart rgclaw"
+echo "  pm2 logs rgclaw"
+echo "  bash scripts/ops/logs.sh"
 echo "  ls -lah logs/"

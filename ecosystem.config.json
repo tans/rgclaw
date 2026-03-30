@@ -2,6 +2,7 @@
   "apps": [
     {
       "name": "rgclaw-web",
+      "namespace": "rgclaw",
       "cwd": ".",
       "script": "src/server/index.ts",
       "interpreter": "bun",
@@ -16,6 +17,7 @@
     },
     {
       "name": "rgclaw-collector",
+      "namespace": "rgclaw",
       "cwd": ".",
       "script": "src/collectors/run.ts",
       "interpreter": "bun",
@@ -30,6 +32,7 @@
     },
     {
       "name": "rgclaw-worker",
+      "namespace": "rgclaw",
       "cwd": ".",
       "script": "src/workers/run.ts",
       "interpreter": "bun",

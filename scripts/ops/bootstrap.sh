@@ -27,5 +27,7 @@ pm2 save
 echo "bootstrap complete"
 echo "follow up:"
 echo "  pm2 status"
+echo "  pm2 restart rgclaw"
+echo "  pm2 logs rgclaw"
 echo "  pm2 startup"
 echo "  bash scripts/ops/healthcheck.sh"

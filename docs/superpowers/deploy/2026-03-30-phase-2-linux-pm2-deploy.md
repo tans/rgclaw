@@ -29,6 +29,7 @@ bash scripts/ops/bootstrap.sh
 ```bash
 mkdir -p logs
 pm2 start ecosystem.config.json
+pm2 save
 ```
 
 5. 配置开机自启。
@@ -48,6 +49,14 @@ pm2 save
 
 ```bash
 bash scripts/ops/status.sh
+```
+
+常用 namespace 操作：
+
+```bash
+pm2 restart rgclaw
+pm2 logs rgclaw
+bash scripts/ops/logs.sh
 ```
 
 7. 执行健康检查：
@@ -94,9 +103,9 @@ location / {
 ## 日志与排障
 
 - `pm2 status`
-- `pm2 logs rgclaw-web`
-- `pm2 logs rgclaw-collector`
-- `pm2 logs rgclaw-worker`
+- `pm2 restart rgclaw`
+- `pm2 logs rgclaw`
+- `bash scripts/ops/logs.sh`
 - `pm2 monit`
 - `ls -lah logs/`
 - `tail -n 100 logs/rgclaw-web.out.log`
@@ -111,4 +120,4 @@ location / {
 - 未登录访问 `/renew` 返回 `302`
 
 它不会验证 `collector` 和 `worker` 最近一轮业务处理是否成功。
-如果需要确认链上拉取、数据库写入或后台任务执行结果，请结合 `pm2 logs rgclaw-collector`、`pm2 logs rgclaw-worker` 和 `logs/` 目录一起排查。
+如果需要确认链上拉取、数据库写入或后台任务执行结果，请结合 `pm2 logs rgclaw` 和 `logs/` 目录一起排查。

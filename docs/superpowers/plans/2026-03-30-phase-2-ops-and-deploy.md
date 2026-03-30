@@ -196,7 +196,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-pm2 restart rgclaw-web rgclaw-collector rgclaw-worker
+pm2 restart rgclaw
 ```
 
 - [ ] **Step 4: 写 `status.sh`**
@@ -213,9 +213,7 @@ cd "$ROOT_DIR"
 pm2 status
 echo
 echo "Logs:"
-echo "  pm2 logs rgclaw-web"
-echo "  pm2 logs rgclaw-collector"
-echo "  pm2 logs rgclaw-worker"
+echo "  pm2 logs rgclaw"
 echo "  ls -lah logs/"
 ```
 
@@ -365,9 +363,7 @@ location / {
 
 ```bash
 pm2 status
-pm2 logs rgclaw-web
-pm2 logs rgclaw-collector
-pm2 logs rgclaw-worker
+pm2 logs rgclaw
 pm2 monit
 ```
 ```
