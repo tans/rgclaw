@@ -1,6 +1,7 @@
 node_modules/
 data/
 .worktrees/
+.env
 
 .DS_Store
 
