@@ -31,7 +31,7 @@ export async function processLaunchPushes() {
         join users on users.id = user_source_subscriptions.user_id
         join user_wechat_bindings
           on user_wechat_bindings.user_id = users.id
-         and user_wechat_bindings.bind_status = 'bound'
+         and user_wechat_bindings.status = 'active'
         join user_entitlements
           on user_entitlements.user_id = users.id
          and user_entitlements.status = 'active'

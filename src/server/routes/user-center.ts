@@ -7,7 +7,9 @@ import {
   listSubscriptions,
   upsertWalletAddress,
 } from "../../db/repositories/subscriptions";
-import { ensureBindCode, getBindingByUserId } from "../../db/repositories/wechat-bindings";
+import { getBindingByUserId } from "../../db/repositories/wechat-bindings";
+import { config } from "../../shared/config";
+import { buildWechatBindCode } from "../../shared/wechat-bind-code";
 import type { AppEnv } from "../middleware/session";
 import { renderUserCenter } from "../views/user-center";
 
@@ -26,7 +28,7 @@ export function userCenterRoutes() {
     }
 
     ensureDefaultSubscriptions(userId);
-    const bindRecord = ensureBindCode(userId);
+    const bindCode = buildWechatBindCode(userId, config.wechatBindSecret);
 
     const db = openDb();
 
@@ -46,8 +48,8 @@ export function userCenterRoutes() {
           entitlementText: entitlement
             ? `${entitlement.expires_at}（${entitlement.plan_type === "trial" ? "3 天试用" : "付费"}）`
             : "暂无",
-          bindingStatusText: binding?.bind_status === "bound" ? "已绑定" : "未绑定",
-          bindInstruction: buildBindInstruction(bindRecord.bind_code),
+          bindingStatusText: binding?.status === "active" ? "已绑定" : "未绑定",
+          bindInstruction: buildBindInstruction(bindCode),
         }),
       );
     } finally {

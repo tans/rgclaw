@@ -48,6 +48,8 @@ describe("user center", () => {
       expect(html).toContain("0xabc123");
       expect(html).toContain("four");
       expect(html).toContain("flap");
+      expect(html).toContain("uid:");
+      expect(html).toContain(user.id);
     } finally {
       db.close();
       cleanup();

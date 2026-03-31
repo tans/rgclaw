@@ -30,8 +30,10 @@ describe("worker run entry", () => {
       db.exec(`
         insert into users (id, email, password_hash, created_at, updated_at)
         values ('u1', 'u1@example.com', 'x', '2026-03-29T00:00:00.000Z', '2026-03-29T00:00:00.000Z');
-        insert into user_wechat_bindings (id, user_id, wechat_user_id, bind_status, bind_code, bound_at)
-        values ('b1', 'u1', 'wx1', 'bound', 'BIND-1', '2026-03-29T00:00:00.000Z');
+        insert into user_wechat_bindings (
+          id, user_id, bot_id, bot_wechat_user_id, status, bound_at, last_inbound_at, last_context_token, created_at, updated_at
+        )
+        values ('b1', 'u1', 'bot-1', 'wx1', 'active', '2026-03-29T00:00:00.000Z', '2026-03-29T00:00:00.000Z', 'ctx-1', '2026-03-29T00:00:00.000Z', '2026-03-29T00:00:00.000Z');
         insert into user_source_subscriptions (id, user_id, source, enabled, created_at, updated_at)
         values ('s1', 'u1', 'flap', 1, '2026-03-29T00:00:00.000Z', '2026-03-29T00:00:00.000Z');
         insert into user_entitlements (id, user_id, plan_type, status, starts_at, expires_at, source, created_at, updated_at)
