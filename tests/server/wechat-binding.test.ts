@@ -130,4 +130,104 @@ describe("wechat binding", () => {
       cleanup();
     }
   });
+
+  test("wechat callback rejects spoofed x-forwarded-for chain", async () => {
+    const { app, cleanup } = setupWechatBindingTestApp();
+
+    try {
+      const callbackRes = await app.request("http://localhost/wechat/callback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "203.0.113.10, 127.0.0.1",
+        },
+        body: JSON.stringify({
+          botId: "bot-1",
+          fromUserId: "wx-user-1",
+          text: "hello",
+          contextToken: "ctx-1",
+          messageId: "msg-spoof-1",
+          receivedAt: "2026-03-31T00:00:00.000Z",
+          rawPayload: {
+            messageId: "msg-spoof-1",
+          },
+        }),
+      });
+
+      expect(callbackRes.status).toBe(403);
+      expect(await callbackRes.text()).toBe("forbidden");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("wechat callback returns 400 on malformed JSON", async () => {
+    const { app, cleanup } = setupWechatBindingTestApp();
+
+    try {
+      const callbackRes = await app.request("http://localhost/wechat/callback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "127.0.0.1",
+        },
+        body: "{",
+      });
+
+      expect(callbackRes.status).toBe(400);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("wechat callback retries processing when inbound row exists in received status", async () => {
+    const { app, dbPath, cleanup } = setupWechatBindingTestApp();
+    const db = openDb(dbPath);
+
+    try {
+      db.query(
+        "insert into wechat_inbound_events (id, message_id, bot_id, from_user_id, text, received_at, process_status, raw_payload, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      ).run(
+        "evt-received-1",
+        "msg-received-1",
+        "bot-1",
+        "wx-user-1",
+        "hello",
+        "2026-03-31T00:00:00.000Z",
+        "received",
+        JSON.stringify({ messageId: "msg-received-1" }),
+        "2026-03-31T00:00:00.000Z",
+      );
+
+      const callbackRes = await app.request("http://localhost/wechat/callback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "127.0.0.1",
+        },
+        body: JSON.stringify({
+          botId: "bot-1",
+          fromUserId: "wx-user-1",
+          text: "hello",
+          contextToken: "ctx-retry-1",
+          messageId: "msg-received-1",
+          receivedAt: "2026-03-31T01:00:00.000Z",
+          rawPayload: {
+            messageId: "msg-received-1",
+          },
+        }),
+      });
+
+      expect(callbackRes.status).toBe(200);
+      expect(await callbackRes.json()).toEqual({ ok: true, action: "unbound_reply" });
+
+      const inboundEvent = db
+        .query("select process_status from wechat_inbound_events where message_id = ?")
+        .get("msg-received-1") as { process_status: string } | null;
+      expect(inboundEvent?.process_status).toBe("unbound_reply");
+    } finally {
+      db.close();
+      cleanup();
+    }
+  });
 });

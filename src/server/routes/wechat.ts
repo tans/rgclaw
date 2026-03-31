@@ -17,19 +17,24 @@ export function wechatRoutes() {
 
   app.post("/wechat/callback", async (c) => {
     const forwardedFor = c.req.header("x-forwarded-for") ?? "";
-    const forwardedAddresses = forwardedFor
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean);
-    const isAllowed = forwardedAddresses.some((value) =>
-      config.wechatCallbackAllowlist.includes(value),
-    );
+    const clientIp = forwardedFor.split(",")[0]?.trim() ?? "";
+    const isAllowed = Boolean(clientIp) && config.wechatCallbackAllowlist.includes(clientIp);
 
     if (!isAllowed) {
       return c.text("forbidden", 403);
     }
 
-    const body = (await c.req.json()) as Record<string, unknown>;
+    let body: Record<string, unknown>;
+    try {
+      const parsed = await c.req.json();
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return c.text("invalid payload", 400);
+      }
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return c.text("invalid payload", 400);
+    }
+
     const payload = {
       botId: typeof body.botId === "string" ? body.botId.trim() : "",
       fromUserId: typeof body.fromUserId === "string" ? body.fromUserId.trim() : "",
@@ -47,8 +52,8 @@ export function wechatRoutes() {
       return c.text("invalid payload", 400);
     }
 
-    const isNewEvent = recordInboundEvent(payload);
-    if (!isNewEvent) {
+    const inboundEvent = recordInboundEvent(payload);
+    if (!inboundEvent.shouldProcess) {
       return c.json({ ok: true, duplicate: true });
     }
 

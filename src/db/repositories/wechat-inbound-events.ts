@@ -11,7 +11,7 @@ export function recordInboundEvent(input: {
   const db = openDb();
 
   try {
-    const result = db
+    const insertResult = db
       .query(
         "insert or ignore into wechat_inbound_events (id, message_id, bot_id, from_user_id, text, received_at, process_status, raw_payload, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
@@ -27,7 +27,15 @@ export function recordInboundEvent(input: {
         new Date().toISOString(),
       );
 
-    return result.changes > 0;
+    if (insertResult.changes > 0) {
+      return { shouldProcess: true };
+    }
+
+    const existingEvent = db
+      .query("select process_status from wechat_inbound_events where message_id = ?")
+      .get(input.messageId) as { process_status: string } | null;
+
+    return { shouldProcess: existingEvent?.process_status === "received" };
   } finally {
     db.close();
   }
