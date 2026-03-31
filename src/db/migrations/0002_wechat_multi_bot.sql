@@ -1,4 +1,4 @@
-create table user_wechat_bindings_v2 (
+create table if not exists user_wechat_bindings_v2 (
   id text primary key,
   user_id text not null,
   bot_id text not null,

@@ -18,6 +18,9 @@ create table if not exists sessions (
 create table if not exists user_wechat_bindings (
   id text primary key,
   user_id text not null,
+  wechat_user_id text,
+  bind_status text,
+  bind_code text,
   bot_id text not null,
   bot_wechat_user_id text not null,
   status text not null,
