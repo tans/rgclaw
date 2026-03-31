@@ -16,10 +16,6 @@ const defaultMigrations: Migration[] = [
     id: "0001_initial_schema",
     sql: readFileSync(new URL("./schema.sql", import.meta.url), "utf8"),
   },
-  {
-    id: "0002_wechat_multi_bot",
-    sql: readFileSync(new URL("./migrations/0002_wechat_multi_bot.sql", import.meta.url), "utf8"),
-  },
 ];
 
 export function runMigrations(path?: string, options: RunMigrationsOptions = {}) {

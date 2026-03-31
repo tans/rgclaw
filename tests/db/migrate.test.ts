@@ -89,8 +89,10 @@ describe("runMigrations", () => {
     const row = db
       .query("select count(*) as count from _migrations where id = ?")
       .get("0001_initial_schema") as { count: number };
+    const total = db.query("select count(*) as count from _migrations").get() as { count: number };
 
     expect(row.count).toBe(1);
+    expect(total.count).toBe(1);
   });
 
   test("migration 在记账前失败时会整体回滚", () => {
