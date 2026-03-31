@@ -497,11 +497,11 @@ func monitorWeixin(user *UserConfig) {
 		}
 
 		var updateRes struct {
-			Ret                  int             `json:"ret"`
-			Errcode              int             `json:"errcode"`
-			GetUpdatesBuf        string          `json:"get_updates_buf"`
-			LongpollingTimeoutMs int             `json:"longpolling_timeout_ms"`
-			Msgs                 []WeixinMessage `json:"msgs"`
+			Ret                  int               `json:"ret"`
+			Errcode              int               `json:"errcode"`
+			GetUpdatesBuf        string            `json:"get_updates_buf"`
+			LongpollingTimeoutMs int               `json:"longpolling_timeout_ms"`
+			Msgs                 []json.RawMessage `json:"msgs"`
 		}
 
 		json.Unmarshal(bodyBytes, &updateRes)
@@ -523,7 +523,12 @@ func monitorWeixin(user *UserConfig) {
 			saveConfig()
 		}
 
-		for _, msg := range updateRes.Msgs {
+		for _, rawMsg := range updateRes.Msgs {
+			var msg WeixinMessage
+			if err := json.Unmarshal(rawMsg, &msg); err != nil {
+				log.Printf("[Bot: %s] failed to decode message payload for callback: %v", user.BotID, err)
+				continue
+			}
 			if msg.FromUserID != "" {
 				configLock.Lock()
 				if msg.ContextToken != "" {
@@ -533,11 +538,6 @@ func monitorWeixin(user *UserConfig) {
 				}
 				configLock.Unlock()
 				saveConfig()
-			}
-
-			rawPayload, rawErr := json.Marshal(msg)
-			if rawErr != nil {
-				log.Printf("[Bot: %s] failed to marshal message for callback: %v", user.BotID, rawErr)
 			}
 
 			for _, item := range msg.ItemList {
@@ -550,7 +550,7 @@ func monitorWeixin(user *UserConfig) {
 						ContextToken: msg.ContextToken,
 						MessageID:    callbackMessageID(user.BotID, msg, item.TextItem.Text),
 						ReceivedAt:   time.Now().UTC().Format(time.RFC3339),
-						RawPayload:   json.RawMessage(rawPayload),
+						RawPayload:   rawMsg,
 					}
 					if err := forwardInboundTextCallback(user, payload); err != nil {
 						log.Printf("[Bot: %s] inbound callback error: %v", user.BotID, err)
@@ -576,6 +576,9 @@ func forwardInboundTextCallback(user *UserConfig, payload inboundTextCallback) e
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if internalAPIToken != "" {
+		req.Header.Set("Authorization", "Bearer "+internalAPIToken)
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -590,7 +593,7 @@ func forwardInboundTextCallback(user *UserConfig, payload inboundTextCallback) e
 }
 
 func callbackMessageID(botID string, msg WeixinMessage, text string) string {
-	source := fmt.Sprintf("%s:%s:%s:%s", botID, msg.FromUserID, msg.ContextToken, text)
+	source := fmt.Sprintf("%s:%s:%s:%s:%d", botID, msg.FromUserID, msg.ContextToken, text, time.Now().UnixNano())
 	hash := sha256.Sum256([]byte(source))
 	return fmt.Sprintf("%s-%x", botID, hash[:8])
 }

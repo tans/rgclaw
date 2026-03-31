@@ -70,10 +70,10 @@ docker exec -it weclawbot-api bot
 
 ## 环境变量
 
-- `WECLAWBOT_CALLBACK_URL`：若设置，所有收到的文本消息会以 JSON POST 到该地址，便于 webhook 异步处理（参考下方「回调」示例）。
-- `WECLAWBOT_INTERNAL_TOKEN`：设置后，该值会作为全局 Bearer Token 被接受，方便集群或内部服务在不读取单个 bot api_token 的情况下调用 API（Header 或 `token=` 参数均可）。
+ - `WECLAWBOT_CALLBACK_URL`：若设置，所有收到的文本消息会以 JSON POST 到该地址，便于 webhook 异步处理（参考下方「回调」示例）。
+ - `WECLAWBOT_INTERNAL_TOKEN`：设置后，该值会作为全局 Bearer Token 被接受，方便集群或内部服务在不读取单个 bot api_token 的情况下调用 API（Header 或 `token=` 参数均可）。同时，回调也会把这个 Token 附加在 `Authorization: Bearer <value>` 头里，方便 webhook 验证来源。
 
-设置 `WECLAWBOT_CALLBACK_URL` 后，服务会在 `callback` 被触发时 POST 一个包含 `botId`、`fromUserId`、`text`、`contextToken`、`messageId`、`receivedAt` 及原始 payload 的 JSON 结构。`WECLAWBOT_INTERNAL_TOKEN` 同样可以直接作为 webhook 或 API 的 Bearer Token 使用，统一授权来源。
+设置 `WECLAWBOT_CALLBACK_URL` 后，服务会在 `callback` 被触发时 POST 一个包含 `botId`、`fromUserId`、`text`、`contextToken`、`messageId`、`receivedAt` 及原始 payload 的 JSON 结构，并在 `WECLAWBOT_INTERNAL_TOKEN` 设置时附加 `Authorization: Bearer <token>` 头以便 webhook 端验证。
 
 ### 回调示例
 ```json
