@@ -18,11 +18,38 @@ create table if not exists sessions (
 create table if not exists user_wechat_bindings (
   id text primary key,
   user_id text not null,
-  wechat_user_id text,
-  bind_status text not null,
-  bind_code text not null,
+  bot_id text not null,
+  bot_wechat_user_id text not null,
+  status text not null,
   bound_at text,
-  last_error text
+  unbound_at text,
+  last_inbound_at text,
+  last_outbound_at text,
+  last_keepalive_sent_at text,
+  last_context_token text,
+  last_error text,
+  created_at text not null,
+  updated_at text not null
+);
+
+create unique index if not exists idx_user_wechat_bindings_active_user
+  on user_wechat_bindings (user_id)
+  where status = 'active';
+
+create unique index if not exists idx_user_wechat_bindings_active_conversation
+  on user_wechat_bindings (bot_id, bot_wechat_user_id)
+  where status = 'active';
+
+create table if not exists wechat_inbound_events (
+  id text primary key,
+  message_id text not null unique,
+  bot_id text not null,
+  from_user_id text not null,
+  text text not null,
+  received_at text not null,
+  process_status text not null,
+  raw_payload text not null,
+  created_at text not null
 );
 
 create table if not exists launch_events (

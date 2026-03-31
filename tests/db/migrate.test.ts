@@ -41,6 +41,30 @@ describe("runMigrations", () => {
     expect(row?.name).toBe("launch_events");
   });
 
+  test("升级后具备多 Bot 绑定结构", () => {
+    runMigrations(testDbPath);
+    const db = openDb(testDbPath);
+
+    const inboundEventsTable = db
+      .query("select name from sqlite_master where type = 'table' and name = 'wechat_inbound_events'")
+      .get() as { name: string } | null;
+    const userWechatBindingsColumns = db
+      .query("pragma table_info(user_wechat_bindings)")
+      .all() as Array<{ name: string }>;
+    const activeUserIndex = db
+      .query(
+        "select name from sqlite_master where type = 'index' and name = 'idx_user_wechat_bindings_active_user'",
+      )
+      .get() as { name: string } | null;
+
+    const columnNames = new Set(userWechatBindingsColumns.map((column) => column.name));
+
+    expect(inboundEventsTable?.name).toBe("wechat_inbound_events");
+    expect(columnNames.has("bot_id")).toBe(true);
+    expect(columnNames.has("last_keepalive_sent_at")).toBe(true);
+    expect(activeUserIndex?.name).toBe("idx_user_wechat_bindings_active_user");
+  });
+
   test("默认路径可自举创建 data 目录", () => {
     mkdirSync(testDefaultBaseDir, { recursive: true });
     process.chdir(testDefaultBaseDir);
