@@ -82,7 +82,7 @@ docker exec -it weclawbot-api bot
   "fromUserId": "wx-user-123",
   "text": "你好，欢迎回来！",
   "contextToken": "ctx-abc-123",
-  "messageId": "bot-alpha-1a2b3c4d",
+  "messageId": "bot-alpha-1a2b3c4d5e6f7890",
   "receivedAt": "2026-03-31T00:00:00Z",
   "rawPayload": {
     "from_user_id": "wx-user-123",
