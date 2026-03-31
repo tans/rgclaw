@@ -22,6 +22,8 @@ function setupWechatBindingTestApp() {
       delete process.env.DATABASE_PATH;
       delete process.env.WECHAT_BIND_SECRET;
       delete process.env.WECHAT_CALLBACK_ALLOWLIST;
+      delete process.env.WECHAT_BOT_API_BASE_URL;
+      delete process.env.WECHAT_BOT_API_TOKEN;
     },
   };
 }
@@ -68,6 +70,19 @@ describe("wechat binding", () => {
 
       expect(callbackRes.status).toBe(200);
       expect(await callbackRes.json()).toEqual({ ok: true, action: "bound" });
+      const bindJob = db
+        .query(
+          "select user_id, message_type, payload, status from system_message_jobs where user_id = ? and message_type = 'binding_success' limit 1",
+        )
+        .get(user.id) as
+        | { user_id: string; message_type: string; payload: string; status: string }
+        | null;
+      expect(bindJob).toEqual({
+        user_id: user.id,
+        message_type: "binding_success",
+        payload: "绑定成功，后续通知会通过这个微信发送。",
+        status: "pending",
+      });
 
       const meRes = await app.request("http://localhost/me", {
         headers: {
@@ -125,6 +140,104 @@ describe("wechat binding", () => {
         .query("select count(*) as count from user_wechat_bindings where user_id = ?")
         .get(user.id) as { count: number };
       expect(bindingCount.count).toBe(1);
+    } finally {
+      db.close();
+      cleanup();
+    }
+  });
+
+  test("绑定用户普通文本会创建自动回复任务且消息去重", async () => {
+    const { app, dbPath, cleanup } = setupWechatBindingTestApp();
+    const db = openDb(dbPath);
+
+    try {
+      const user = await createUser("wechat-auto@example.com", "pass123456");
+      const session = createSession(user.id);
+      const bindPage = await app.request("http://localhost/me", {
+        headers: {
+          cookie: `session_id=${session.id}`,
+        },
+      });
+      const bindPageHtml = await bindPage.text();
+      const bindCode = bindPageHtml.match(/uid:[^<\s]+/)?.[0];
+      expect(bindCode).toBeTruthy();
+
+      await app.request("http://localhost/wechat/callback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "127.0.0.1",
+        },
+        body: JSON.stringify({
+          botId: "bot-1",
+          fromUserId: "wx-user-1",
+          text: bindCode,
+          contextToken: "ctx-bind-1",
+          messageId: "msg-bind-1",
+          receivedAt: "2026-03-31T00:00:00.000Z",
+          rawPayload: {
+            messageId: "msg-bind-1",
+          },
+        }),
+      });
+
+      const callbackRes = await app.request("http://localhost/wechat/callback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "127.0.0.1",
+        },
+        body: JSON.stringify({
+          botId: "bot-1",
+          fromUserId: "wx-user-1",
+          text: "hello",
+          contextToken: "ctx-auto-1",
+          messageId: "msg-auto-1",
+          receivedAt: "2026-03-31T01:00:00.000Z",
+          rawPayload: {
+            messageId: "msg-auto-1",
+          },
+        }),
+      });
+
+      expect(callbackRes.status).toBe(200);
+      expect(await callbackRes.json()).toEqual({ ok: true, action: "auto_reply" });
+
+      const jobCount = db
+        .query(
+          "select count(*) as count from system_message_jobs where user_id = ? and message_type = 'auto_reply' and payload = ?",
+        )
+        .get(user.id, "查询和狙击功能开发中") as { count: number };
+      expect(jobCount.count).toBe(1);
+
+      const duplicateRes = await app.request("http://localhost/wechat/callback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "127.0.0.1",
+        },
+        body: JSON.stringify({
+          botId: "bot-1",
+          fromUserId: "wx-user-1",
+          text: "hello",
+          contextToken: "ctx-auto-1",
+          messageId: "msg-auto-1",
+          receivedAt: "2026-03-31T01:00:00.000Z",
+          rawPayload: {
+            messageId: "msg-auto-1",
+          },
+        }),
+      });
+
+      expect(duplicateRes.status).toBe(200);
+      expect(await duplicateRes.json()).toEqual({ ok: true, duplicate: true });
+
+      const duplicateCount = db
+        .query(
+          "select count(*) as count from system_message_jobs where user_id = ? and message_type = 'auto_reply' and payload = ?",
+        )
+        .get(user.id, "查询和狙击功能开发中") as { count: number };
+      expect(duplicateCount.count).toBe(1);
     } finally {
       db.close();
       cleanup();
@@ -209,7 +322,7 @@ describe("wechat binding", () => {
           botId: "bot-1",
           fromUserId: "wx-user-1",
           text: "hello",
-          contextToken: "ctx-retry-1",
+          contextToken: "",
           messageId: "msg-received-1",
           receivedAt: "2026-03-31T01:00:00.000Z",
           rawPayload: {
@@ -226,6 +339,72 @@ describe("wechat binding", () => {
         .get("msg-received-1") as { process_status: string } | null;
       expect(inboundEvent?.process_status).toBe("unbound_reply");
     } finally {
+      db.close();
+      cleanup();
+    }
+  });
+
+  test("未绑定用户普通文本会直接尝试回复且不落持久任务", async () => {
+    const { app, dbPath, cleanup } = setupWechatBindingTestApp();
+    const db = openDb(dbPath);
+    let sentRequests: Array<{
+      path: string;
+      authorization: string;
+      body: Record<string, unknown>;
+    }> = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (request) => {
+        sentRequests.push({
+          path: new URL(request.url).pathname,
+          authorization: request.headers.get("authorization") ?? "",
+          body: (await request.json()) as Record<string, unknown>,
+        });
+        return Response.json({ code: 200, message: "OK" });
+      },
+    });
+    process.env.WECHAT_BOT_API_BASE_URL = `http://127.0.0.1:${server.port}`;
+    process.env.WECHAT_BOT_API_TOKEN = "test-api-token";
+
+    try {
+      const callbackRes = await app.request("http://localhost/wechat/callback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "127.0.0.1",
+        },
+        body: JSON.stringify({
+          botId: "bot-1",
+          fromUserId: "wx-user-unbound-1",
+          text: "hello",
+          contextToken: "ctx-unbound-1",
+          messageId: "msg-unbound-1",
+          receivedAt: "2026-03-31T00:00:00.000Z",
+          rawPayload: {
+            messageId: "msg-unbound-1",
+          },
+        }),
+      });
+
+      expect(callbackRes.status).toBe(200);
+      expect(await callbackRes.json()).toEqual({ ok: true, action: "unbound_reply" });
+      expect(sentRequests).toHaveLength(1);
+      expect(sentRequests[0]).toEqual({
+        path: "/bots/bot-1/messages",
+        authorization: "Bearer test-api-token",
+        body: {
+          text: "请先发送绑定码完成绑定",
+          toUserId: "wx-user-unbound-1",
+          contextToken: "ctx-unbound-1",
+        },
+      });
+
+      const jobs = db
+        .query("select count(*) as count from system_message_jobs")
+        .get() as { count: number };
+      expect(jobs.count).toBe(0);
+    } finally {
+      server.stop(true);
       db.close();
       cleanup();
     }

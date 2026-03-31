@@ -1,8 +1,24 @@
-import { buildRenewalReminder } from "../adapters/wechat-bot";
 import {
+  buildKeepaliveReminder,
+  buildLaunchMessage,
+  buildRenewalReminder,
+  sendWechatMessage,
+} from "../adapters/wechat-bot";
+import {
+  claimPendingNotificationJobs,
+  claimPendingSystemMessageJobs,
   createNotificationJob,
   createSystemMessageJob,
+  markNotificationJobRetried,
+  markNotificationJobSent,
+  markSystemMessageJobRetried,
+  markSystemMessageJobSent,
 } from "../db/repositories/notification-jobs";
+import {
+  findActiveBindingByUserId,
+  listBindingsNeedingKeepalive,
+  markBindingOutboundSent,
+} from "../db/repositories/wechat-bindings";
 import { markReminderSent } from "../db/repositories/entitlements";
 import { openDb } from "../db/sqlite";
 
@@ -15,6 +31,11 @@ type ReminderRow = {
   id: string;
   user_id: string;
   expires_at: string;
+};
+
+type LaunchContentRow = {
+  title: string;
+  token_address: string;
 };
 
 export async function processLaunchPushes() {
@@ -85,4 +106,112 @@ export async function processRenewalReminders() {
   } finally {
     db.close();
   }
+}
+
+export async function enqueueKeepaliveReminders(now = new Date().toISOString()) {
+  const rows = listBindingsNeedingKeepalive(now);
+
+  for (const row of rows) {
+    createSystemMessageJob({
+      userId: row.user_id,
+      messageType: "keepalive",
+      payload: buildKeepaliveReminder(),
+    });
+  }
+
+  return rows.length;
+}
+
+function getLaunchContent(launchEventId: string) {
+  const db = openDb();
+
+  try {
+    return db
+      .query("select title, token_address from launch_events where id = ?")
+      .get(launchEventId) as LaunchContentRow | null;
+  } finally {
+    db.close();
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export async function dispatchPendingSystemMessages(options: {
+  sendMessage?: typeof sendWechatMessage;
+} = {}) {
+  const sendMessage = options.sendMessage ?? sendWechatMessage;
+  const jobs = claimPendingSystemMessageJobs();
+  let sent = 0;
+
+  for (const job of jobs) {
+    const binding = findActiveBindingByUserId(job.user_id);
+
+    if (!binding || !binding.last_context_token) {
+      markSystemMessageJobRetried(job.id, "binding missing", job.attempt_count + 1 >= 3);
+      continue;
+    }
+
+    try {
+      await sendMessage({
+        botId: binding.bot_id,
+        toUserId: binding.bot_wechat_user_id,
+        contextToken: binding.last_context_token,
+        text: job.payload,
+      });
+    } catch (error) {
+      markSystemMessageJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
+      continue;
+    }
+
+    const sentAt = new Date().toISOString();
+    markSystemMessageJobSent(job.id, sentAt);
+    markBindingOutboundSent(binding.id, sentAt, job.message_type === "keepalive");
+    sent += 1;
+  }
+
+  return sent;
+}
+
+export async function dispatchPendingNotificationMessages(options: {
+  sendMessage?: typeof sendWechatMessage;
+} = {}) {
+  const sendMessage = options.sendMessage ?? sendWechatMessage;
+  const jobs = claimPendingNotificationJobs();
+  let sent = 0;
+
+  for (const job of jobs) {
+    const binding = findActiveBindingByUserId(job.user_id);
+
+    if (!binding || !binding.last_context_token) {
+      markNotificationJobRetried(job.id, "binding missing", job.attempt_count + 1 >= 3);
+      continue;
+    }
+
+    const launch = getLaunchContent(job.launch_event_id);
+    if (!launch) {
+      markNotificationJobRetried(job.id, "launch event missing", job.attempt_count + 1 >= 3);
+      continue;
+    }
+
+    try {
+      await sendMessage({
+        botId: binding.bot_id,
+        toUserId: binding.bot_wechat_user_id,
+        contextToken: binding.last_context_token,
+        text: buildLaunchMessage(launch.title, launch.token_address),
+      });
+    } catch (error) {
+      markNotificationJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
+      continue;
+    }
+
+    const sentAt = new Date().toISOString();
+    markNotificationJobSent(job.id, sentAt);
+    markBindingOutboundSent(binding.id, sentAt, false);
+    sent += 1;
+  }
+
+  return sent;
 }

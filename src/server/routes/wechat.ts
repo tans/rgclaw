@@ -1,5 +1,12 @@
 import { Hono } from "hono";
+import {
+  buildBindingSuccessMessage,
+  buildGenericWechatAutoReply,
+  buildUnboundWechatReply,
+  sendWechatMessage,
+} from "../../adapters/wechat-bot";
 import { ensureTrialEntitlement } from "../../db/repositories/entitlements";
+import { createSystemMessageJob } from "../../db/repositories/notification-jobs";
 import {
   findActiveBindingByConversation,
   replaceActiveWechatBinding,
@@ -74,14 +81,37 @@ export function wechatRoutes() {
         now: payload.receivedAt,
       });
       ensureTrialEntitlement(parsedBindCode.userId);
+      createSystemMessageJob({
+        userId: parsedBindCode.userId,
+        messageType: "binding_success",
+        payload: buildBindingSuccessMessage(),
+      });
       markInboundEventProcessed(payload.messageId, "bound");
       return c.json({ ok: true, action: "bound" });
     }
 
     const binding = findActiveBindingByConversation(payload.botId, payload.fromUserId);
     if (binding) {
+      createSystemMessageJob({
+        userId: binding.user_id,
+        messageType: "auto_reply",
+        payload: buildGenericWechatAutoReply(),
+      });
       markInboundEventProcessed(payload.messageId, "auto_reply");
       return c.json({ ok: true, action: "auto_reply" });
+    }
+
+    if (payload.contextToken) {
+      try {
+        await sendWechatMessage({
+          botId: payload.botId,
+          toUserId: payload.fromUserId,
+          contextToken: payload.contextToken,
+          text: buildUnboundWechatReply(),
+        });
+      } catch {
+        // Unbound replies are best-effort and should not block callback acknowledgement.
+      }
     }
 
     markInboundEventProcessed(payload.messageId, "unbound_reply");

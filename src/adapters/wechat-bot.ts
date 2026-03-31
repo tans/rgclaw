@@ -1,8 +1,58 @@
+import { config } from "../shared/config";
+
 export function buildBindInstruction(bindCode: string) {
   return `请把以下绑定码发送给任意一个已登录的微信机器人：${bindCode}`;
 }
 
-export async function sendWechatMessage(_wechatUserId: string, _content: string) {
+export function buildBindingSuccessMessage() {
+  return "绑定成功，后续通知会通过这个微信发送。";
+}
+
+export function buildGenericWechatAutoReply() {
+  return "查询和狙击功能开发中";
+}
+
+export function buildUnboundWechatReply() {
+  return "请先发送绑定码完成绑定";
+}
+
+export function buildKeepaliveReminder() {
+  return "为保持通知能力，请回复任意消息。";
+}
+
+type SendWechatMessageInput = {
+  botId: string;
+  toUserId: string;
+  text: string;
+  contextToken?: string | null;
+};
+
+export async function sendWechatMessage(input: SendWechatMessageInput) {
+  const baseUrl = config.wechatBotApiBaseUrl.replace(/\/+$/, "");
+  const endpoint = `${baseUrl}/bots/${encodeURIComponent(input.botId)}/messages`;
+  const payload: Record<string, string> = {
+    text: input.text,
+    toUserId: input.toUserId,
+  };
+
+  if (input.contextToken) {
+    payload.contextToken = input.contextToken;
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${config.wechatBotApiToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const body = (await response.text()).trim();
+    throw new Error(`wechat send failed (${response.status}): ${body || "empty response"}`);
+  }
+
   return { ok: true };
 }
 
