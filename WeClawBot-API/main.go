@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -28,12 +29,12 @@ import (
 const DefaultBaseURL = "https://ilinkai.weixin.qq.com"
 
 type UserConfig struct {
-	BotToken      string `json:"bot_token"`
-	BotID         string `json:"bot_id"`
-	GetUpdatesBuf string `json:"get_updates_buf"`
-	IlinkUserID   string `json:"ilink_user_id"`
-	ContextToken  string `json:"context_token"`
-	APIToken      string `json:"api_token"`
+	BotToken         string `json:"bot_token"`
+	BotID            string `json:"bot_id"`
+	GetUpdatesBuf    string `json:"get_updates_buf"`
+	IlinkUserID      string `json:"ilink_user_id"`
+	ContextToken     string `json:"context_token"`
+	APIToken         string `json:"api_token"`
 	LastTargetUserID string `json:"last_target_user_id"`
 	LastContextToken string `json:"last_context_token"`
 }
@@ -45,9 +46,32 @@ type AppConfig struct {
 type sendMessageFunc func(*UserConfig, string, string, string) error
 
 type botAPIHandlerDeps struct {
-	cfg          *AppConfig
-	sendMessage  sendMessageFunc
+	cfg           *AppConfig
+	sendMessage   sendMessageFunc
 	internalToken string
+}
+
+type MessageItem struct {
+	Type     int `json:"type"`
+	TextItem struct {
+		Text string `json:"text"`
+	} `json:"text_item"`
+}
+
+type WeixinMessage struct {
+	FromUserID   string        `json:"from_user_id"`
+	ContextToken string        `json:"context_token"`
+	ItemList     []MessageItem `json:"item_list"`
+}
+
+type inboundTextCallback struct {
+	BotID        string          `json:"botId"`
+	FromUserID   string          `json:"fromUserId"`
+	Text         string          `json:"text"`
+	ContextToken string          `json:"contextToken"`
+	MessageID    string          `json:"messageId"`
+	ReceivedAt   string          `json:"receivedAt"`
+	RawPayload   json.RawMessage `json:"rawPayload"`
 }
 
 var (
@@ -56,6 +80,7 @@ var (
 	configLock       sync.Mutex
 	activeUser       string // 当前控制台正在使用的 BotID
 	internalAPIToken string
+	callbackURL      string
 	sendMessageFn    = sendMessage
 )
 
@@ -69,6 +94,7 @@ func main() {
 	port := flag.Int("port", 26322, "API server port")
 	flag.Parse()
 	internalAPIToken = os.Getenv("WECLAWBOT_INTERNAL_TOKEN")
+	callbackURL = os.Getenv("WECLAWBOT_CALLBACK_URL")
 
 	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 		log.Fatalf("Init config dir failed: %v", err)
@@ -470,19 +496,6 @@ func monitorWeixin(user *UserConfig) {
 			continue
 		}
 
-		type MessageItem struct {
-			Type     int `json:"type"`
-			TextItem struct {
-				Text string `json:"text"`
-			} `json:"text_item"`
-		}
-
-		type WeixinMessage struct {
-			FromUserID   string        `json:"from_user_id"`
-			ContextToken string        `json:"context_token"`
-			ItemList     []MessageItem `json:"item_list"`
-		}
-
 		var updateRes struct {
 			Ret                  int             `json:"ret"`
 			Errcode              int             `json:"errcode"`
@@ -522,15 +535,64 @@ func monitorWeixin(user *UserConfig) {
 				saveConfig()
 			}
 
+			rawPayload, rawErr := json.Marshal(msg)
+			if rawErr != nil {
+				log.Printf("[Bot: %s] failed to marshal message for callback: %v", user.BotID, rawErr)
+			}
+
 			for _, item := range msg.ItemList {
 				if item.Type == 1 && item.TextItem.Text != "" {
 					fmt.Printf("\n[Bot: %s | Message from %s]: %s\n> ", user.BotID, msg.FromUserID, item.TextItem.Text)
+					payload := inboundTextCallback{
+						BotID:        user.BotID,
+						FromUserID:   msg.FromUserID,
+						Text:         item.TextItem.Text,
+						ContextToken: msg.ContextToken,
+						MessageID:    callbackMessageID(user.BotID, msg, item.TextItem.Text),
+						ReceivedAt:   time.Now().UTC().Format(time.RFC3339),
+						RawPayload:   json.RawMessage(rawPayload),
+					}
+					if err := forwardInboundTextCallback(user, payload); err != nil {
+						log.Printf("[Bot: %s] inbound callback error: %v", user.BotID, err)
+					}
 				} else {
 					fmt.Printf("\n[Bot: %s | Message from %s]: <Media/Other type %d>\n> ", user.BotID, msg.FromUserID, item.Type)
 				}
 			}
 		}
 	}
+}
+
+func forwardInboundTextCallback(user *UserConfig, payload inboundTextCallback) error {
+	if callbackURL == "" {
+		return nil
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPost, callbackURL, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("callback target returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
+}
+
+func callbackMessageID(botID string, msg WeixinMessage, text string) string {
+	source := fmt.Sprintf("%s:%s:%s:%s", botID, msg.FromUserID, msg.ContextToken, text)
+	hash := sha256.Sum256([]byte(source))
+	return fmt.Sprintf("%s-%x", botID, hash[:8])
 }
 
 func printBots() {
