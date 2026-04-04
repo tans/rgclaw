@@ -159,6 +159,10 @@ export class HubWsConnectionPool {
     }
   }
 
+  get(apiKey: string): HubWsClient | undefined {
+    return this.connections.get(apiKey)?.client;
+  }
+
   broadcastToChannel(apiKey: string, channelId: string, payload: { to_user_id: string; content: string; context_token?: string }) {
     const entry = this.connections.get(apiKey);
     if (!entry) return;

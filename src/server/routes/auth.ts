@@ -86,7 +86,7 @@ export function authRoutes() {
     setCookie(c, "session_id", session.id, sessionCookieOptions());
 
     // Store Hub session cookie so subsequent Hub API calls work
-    setCookie(c, "hub_session", hubSession, sessionCookieOptions());
+    setCookie(c, "hub_session", hubSession!, sessionCookieOptions());
 
     return c.redirect("/me", 302);
   });

@@ -6,6 +6,7 @@ import {
   hubConfirmBotBind,
   hubGetBotStatus,
 } from "../../openilink/client";
+import { hubSubscribeChannel, hubUnsubscribeChannel } from "../../openilink/hub-ws-service";
 import {
   findActiveChannelBindingByUserId,
   replaceActiveChannelBinding,
@@ -105,6 +106,9 @@ export function wechatRoutes() {
       // Give trial entitlement on first successful bind
       ensureTrialEntitlement(userId);
 
+      // Subscribe to Hub WebSocket relay for this channel
+      hubSubscribeChannel(bindResult.api_key, bindResult.channel_id, bindResult.bot_id);
+
       return c.json({
         ok: true,
         botId: bindResult.bot_id,
@@ -159,6 +163,8 @@ export function wechatRoutes() {
     const { deactivateChannelBinding } = await import("../../db/repositories/channel-bindings");
     const binding = findActiveChannelBindingByUserId(userId);
     if (binding) {
+      // Unsubscribe from Hub WS relay before deactivating
+      hubUnsubscribeChannel(binding.hub_api_key, binding.hub_channel_id);
       deactivateChannelBinding(binding.id, new Date().toISOString());
     }
 

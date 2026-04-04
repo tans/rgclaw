@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { getCookie } from "hono/cookie";
 import { openDb } from "../../db/sqlite";
 import { getActiveEntitlement } from "../../db/repositories/entitlements";
 import {
@@ -7,7 +6,6 @@ import {
   listSubscriptions,
   upsertWalletAddress,
 } from "../../db/repositories/subscriptions";
-import { getBindingByUserId } from "../../db/repositories/wechat-bindings";
 import { findActiveChannelBindingByUserId } from "../../db/repositories/channel-bindings";
 import type { AppEnv } from "../middleware/session";
 import { renderUserCenter } from "../views/user-center";
