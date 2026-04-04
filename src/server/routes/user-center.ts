@@ -47,9 +47,7 @@ export function userCenterRoutes() {
             ? `${entitlement.expires_at}（${entitlement.plan_type === "trial" ? "3 天试用" : "付费"}）`
             : "暂无",
           bindingStatusText: hubBinding ? "已绑定（Hub）" : "未绑定",
-          bindInstruction: hubBinding
-            ? "已通过 OpeniLink Hub 绑定微信"
-            : "请到微信绑定页面扫码绑定",
+          bound: !!hubBinding,
         }),
       );
     } finally {

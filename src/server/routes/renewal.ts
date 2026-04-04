@@ -1,5 +1,8 @@
 import { Hono } from "hono";
+import { getCookie } from "hono/cookie";
 import { openDb } from "../../db/sqlite";
+import { getActiveEntitlement } from "../../db/repositories/entitlements";
+import { upsertWalletAddress } from "../../db/repositories/subscriptions";
 import type { AppEnv } from "../middleware/session";
 import { renderRenewalPage } from "../views/renewal";
 
@@ -23,10 +26,33 @@ export function renewalRoutes() {
         .query("select wallet_address from users where id = ?")
         .get(userId) as RenewalUserRecord | null;
 
-      return c.html(renderRenewalPage(user?.wallet_address ?? ""));
+      const entitlement = getActiveEntitlement(userId);
+
+      return c.html(renderRenewalPage({
+        walletAddress: user?.wallet_address ?? "",
+        entitlementExpiresAt: entitlement?.expires_at ?? null,
+        planType: entitlement?.plan_type ?? null,
+      }));
     } finally {
       db.close();
     }
+  });
+
+  // POST /renew — handle wallet address update from renewal page
+  app.post("/renew", async (c) => {
+    const userId = c.get("sessionUserId");
+    if (!userId) {
+      return c.redirect("/", 302);
+    }
+
+    const body = await c.req.parseBody();
+    const walletAddress = body.walletAddress;
+
+    if (typeof walletAddress === "string" && walletAddress.trim()) {
+      upsertWalletAddress(userId, walletAddress.trim());
+    }
+
+    return c.redirect("/renew", 302);
   });
 
   return app;

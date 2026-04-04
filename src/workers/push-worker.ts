@@ -34,6 +34,7 @@ type ReminderRow = {
 type LaunchContentRow = {
   title: string;
   token_address: string;
+  source: string;
 };
 
 export async function processLaunchPushes() {
@@ -158,7 +159,7 @@ function getLaunchContent(launchEventId: string) {
 
   try {
     return db
-      .query("select title, token_address from launch_events where id = ?")
+      .query("select title, token_address, source from launch_events where id = ?")
       .get(launchEventId) as LaunchContentRow | null;
   } finally {
     db.close();
@@ -254,7 +255,7 @@ export async function dispatchPendingNotificationMessages() {
           bot_wechat_user_id: binding.bot_wechat_user_id ?? "",
           last_context_token: binding.last_context_token,
         },
-        buildLaunchMessage(launch.title, launch.token_address),
+        buildLaunchMessage(launch.title, launch.token_address, launch.source),
       );
     } catch (error) {
       markNotificationJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);

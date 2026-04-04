@@ -5,6 +5,7 @@ import { createSession } from "../../db/repositories/sessions";
 import { upsertUserByHubUserId } from "../../db/repositories/users";
 import { hubGetMe } from "../../openilink/client";
 import { config } from "../../shared/config";
+import { renderLoginPage } from "../views/login";
 import type { AppEnv } from "../middleware/session";
 
 const SESSION_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
@@ -21,6 +22,11 @@ function sessionCookieOptions() {
 
 export function authRoutes() {
   const app = new Hono<AppEnv>();
+
+  // GET /auth/login — render login/register page
+  app.get("/auth/login", (c) => {
+    return c.html(renderLoginPage());
+  });
 
   // -----------------------------------------------------------------
   // Hub OAuth login — redirect to Hub

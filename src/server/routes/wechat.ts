@@ -12,6 +12,7 @@ import {
   replaceActiveChannelBinding,
 } from "../../db/repositories/channel-bindings";
 import { ensureTrialEntitlement } from "../../db/repositories/entitlements";
+import { renderWechatBindPage } from "../views/wechat-bind";
 import type { AppEnv } from "../middleware/session";
 
 // How long a pending bind QR stays valid before it expires
@@ -42,6 +43,61 @@ export function wechatRoutes() {
       console.error("hubListBots failed:", err);
       return c.json({ error: "failed to fetch bots" }, 502);
     }
+  });
+
+  // GET /wechat/bind — render the WeChat binding UI
+  app.get("/wechat/bind", async (c) => {
+    const hubSession = getCookie(c, "hub_session");
+    const userId = c.get("sessionUserId");
+
+    if (!userId) {
+      return c.redirect("/", 302);
+    }
+
+    const hubConnected = !!hubSession;
+
+    // Build Hub OAuth URL if not connected
+    const hubOAuthUrl = hubConnected ? "" : "/auth/oauth/github";
+
+    // Check existing binding
+    const binding = hubSession ? findActiveChannelBindingByUserId(userId) : null;
+
+    if (binding) {
+      return c.html(
+        renderWechatBindPage({
+          hubConnected,
+          hubOAuthUrl,
+          qrCodeUrl: null,
+          bindingStatus: "bound",
+          botName: binding.hub_bot_id,
+          boundAt: binding.bound_at ?? undefined,
+        }),
+      );
+    }
+
+    // Check pending bind (user already started a QR flow)
+    const pending = pendingBinds.get(userId);
+    if (pending) {
+      // Return page with the stored QR URL - client polls for confirmation
+      // We don't have the QR URL stored, so ask client to refetch
+      return c.html(
+        renderWechatBindPage({
+          hubConnected,
+          hubOAuthUrl,
+          qrCodeUrl: null,
+          bindingStatus: "idle",
+        }),
+      );
+    }
+
+    return c.html(
+      renderWechatBindPage({
+        hubConnected,
+        hubOAuthUrl,
+        qrCodeUrl: null,
+        bindingStatus: "idle",
+      }),
+    );
   });
 
   // POST /wechat/bind/start — start Hub QR-code binding flow
