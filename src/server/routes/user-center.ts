@@ -55,7 +55,11 @@ export function userCenterRoutes() {
           walletAddress: user?.wallet_address ?? "",
           subscriptions,
           entitlementText: entitlement
-            ? `${entitlement.expires_at}（${entitlement.plan_type === "trial" ? "3 天试用" : "付费"}）`
+            ? entitlement.plan_type === "trial"
+              ? trialDaysLeft !== undefined && trialDaysLeft >= 0
+                ? `试用中（剩余 ${trialDaysLeft} 天）`
+                : "试用已到期"
+              : "付费"
             : "暂无",
           bindingStatusText: hubBinding ? "已绑定（Hub）" : "未绑定",
           bound: !!hubBinding,
