@@ -2,7 +2,6 @@ import {
   buildKeepaliveReminder,
   buildLaunchMessage,
   buildRenewalReminder,
-  sendWechatMessage,
 } from "../adapters/wechat-bot";
 import {
   claimPendingNotificationJobs,
@@ -15,12 +14,11 @@ import {
   markSystemMessageJobSent,
 } from "../db/repositories/notification-jobs";
 import {
-  findActiveBindingByUserId,
-  listBindingsNeedingKeepalive,
-  markBindingOutboundSent,
-} from "../db/repositories/wechat-bindings";
+  findActiveChannelBindingByUserId,
+} from "../db/repositories/channel-bindings";
 import { markReminderSent } from "../db/repositories/entitlements";
 import { openDb } from "../db/sqlite";
+import { hubSendChannelMessage } from "../openilink/client";
 
 type LaunchPushRow = {
   launch_event_id: string;
@@ -50,9 +48,9 @@ export async function processLaunchPushes() {
           on user_source_subscriptions.source = launch_events.source
          and user_source_subscriptions.enabled = 1
         join users on users.id = user_source_subscriptions.user_id
-        join user_wechat_bindings
-          on user_wechat_bindings.user_id = users.id
-         and user_wechat_bindings.status = 'active'
+        join channel_bindings
+          on channel_bindings.user_id = users.id
+         and channel_bindings.status = 'active'
         join user_entitlements
           on user_entitlements.user_id = users.id
          and user_entitlements.status = 'active'
@@ -109,17 +107,50 @@ export async function processRenewalReminders() {
 }
 
 export async function enqueueKeepaliveReminders(now = new Date().toISOString()) {
-  const rows = listBindingsNeedingKeepalive(now);
+  const db = openDb();
 
-  for (const row of rows) {
-    createSystemMessageJob({
-      userId: row.user_id,
-      messageType: "keepalive",
-      payload: buildKeepaliveReminder(),
-    });
+  try {
+    const rows = db
+      .query(`
+        select distinct cb.user_id
+        from channel_bindings cb
+        join user_entitlements ue
+          on ue.user_id = cb.user_id
+         and ue.status = 'active'
+         and datetime(ue.expires_at) > datetime(?)
+        join user_source_subscriptions uss
+          on uss.user_id = cb.user_id
+         and uss.enabled = 1
+        where cb.status = 'active'
+          and cb.hub_outbound_at is not null
+          and datetime(cb.hub_outbound_at) <= datetime(?, '-18 hours')
+          and datetime(cb.hub_outbound_at) > datetime(?, '-19 hours')
+          and (
+            cb.hub_keepalive_sent_at is null
+            or datetime(cb.hub_keepalive_sent_at) <= datetime(?, '-1 hour')
+          )
+          and not exists (
+            select 1 from system_message_jobs smj
+            where smj.user_id = cb.user_id
+              and smj.message_type = 'keepalive'
+              and smj.status = 'pending'
+          )
+        limit 50
+      `)
+      .all(now, now, now, now) as Array<{ user_id: string }>;
+
+    for (const row of rows) {
+      createSystemMessageJob({
+        userId: row.user_id,
+        messageType: "keepalive",
+        payload: buildKeepaliveReminder(),
+      });
+    }
+
+    return rows.length;
+  } finally {
+    db.close();
   }
-
-  return rows.length;
 }
 
 function getLaunchContent(launchEventId: string) {
@@ -138,28 +169,51 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export async function dispatchPendingSystemMessages(options: {
-  sendMessage?: typeof sendWechatMessage;
-} = {}) {
-  const sendMessage = options.sendMessage ?? sendWechatMessage;
+async function sendViaHub(binding: { hub_api_key: string; hub_channel_id: string; bot_wechat_user_id: string; last_context_token?: string | null }, text: string) {
+  await hubSendChannelMessage(binding.hub_api_key, binding.hub_channel_id, {
+    to_user_id: binding.bot_wechat_user_id,
+    content: text,
+    context_token: binding.last_context_token ?? undefined,
+  });
+}
+
+async function markOutboundSent(bindingId: string, sentAt: string, keepalive: boolean) {
+  const db = openDb();
+  try {
+    db.query(
+      `update channel_bindings set
+        hub_outbound_at = ?,
+        hub_keepalive_sent_at = case when ? then ? else hub_keepalive_sent_at end,
+        updated_at = ?
+       where id = ?`,
+    ).run(sentAt, keepalive ? 1 : 0, sentAt, sentAt, bindingId);
+  } finally {
+    db.close();
+  }
+}
+
+export async function dispatchPendingSystemMessages() {
   const jobs = claimPendingSystemMessageJobs();
   let sent = 0;
 
   for (const job of jobs) {
-    const binding = findActiveBindingByUserId(job.user_id);
+    const binding = findActiveChannelBindingByUserId(job.user_id);
 
-    if (!binding || !binding.last_context_token) {
+    if (!binding || !binding.hub_api_key) {
       markSystemMessageJobRetried(job.id, "binding missing", job.attempt_count + 1 >= 3);
       continue;
     }
 
     try {
-      await sendMessage({
-        botId: binding.bot_id,
-        toUserId: binding.bot_wechat_user_id,
-        contextToken: binding.last_context_token,
-        text: job.payload,
-      });
+      await sendViaHub(
+        {
+          hub_api_key: binding.hub_api_key,
+          hub_channel_id: binding.hub_channel_id,
+          bot_wechat_user_id: binding.bot_wechat_user_id ?? "", // stored in channel_bindings.bot_wechat_user_id
+          last_context_token: binding.last_context_token,
+        },
+        job.payload,
+      );
     } catch (error) {
       markSystemMessageJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
       continue;
@@ -167,24 +221,21 @@ export async function dispatchPendingSystemMessages(options: {
 
     const sentAt = new Date().toISOString();
     markSystemMessageJobSent(job.id, sentAt);
-    markBindingOutboundSent(binding.id, sentAt, job.message_type === "keepalive");
+    await markOutboundSent(binding.id, sentAt, job.message_type === "keepalive");
     sent += 1;
   }
 
   return sent;
 }
 
-export async function dispatchPendingNotificationMessages(options: {
-  sendMessage?: typeof sendWechatMessage;
-} = {}) {
-  const sendMessage = options.sendMessage ?? sendWechatMessage;
+export async function dispatchPendingNotificationMessages() {
   const jobs = claimPendingNotificationJobs();
   let sent = 0;
 
   for (const job of jobs) {
-    const binding = findActiveBindingByUserId(job.user_id);
+    const binding = findActiveChannelBindingByUserId(job.user_id);
 
-    if (!binding || !binding.last_context_token) {
+    if (!binding || !binding.hub_api_key) {
       markNotificationJobRetried(job.id, "binding missing", job.attempt_count + 1 >= 3);
       continue;
     }
@@ -196,12 +247,15 @@ export async function dispatchPendingNotificationMessages(options: {
     }
 
     try {
-      await sendMessage({
-        botId: binding.bot_id,
-        toUserId: binding.bot_wechat_user_id,
-        contextToken: binding.last_context_token,
-        text: buildLaunchMessage(launch.title, launch.token_address),
-      });
+      await sendViaHub(
+        {
+          hub_api_key: binding.hub_api_key,
+          hub_channel_id: binding.hub_channel_id,
+          bot_wechat_user_id: binding.bot_wechat_user_id ?? "",
+          last_context_token: binding.last_context_token,
+        },
+        buildLaunchMessage(launch.title, launch.token_address),
+      );
     } catch (error) {
       markNotificationJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
       continue;
@@ -209,7 +263,7 @@ export async function dispatchPendingNotificationMessages(options: {
 
     const sentAt = new Date().toISOString();
     markNotificationJobSent(job.id, sentAt);
-    markBindingOutboundSent(binding.id, sentAt, false);
+    await markOutboundSent(binding.id, sentAt, false);
     sent += 1;
   }
 

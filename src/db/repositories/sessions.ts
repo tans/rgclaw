@@ -61,3 +61,13 @@ export function findSession(sessionId: string) {
     db.close();
   }
 }
+
+export function deleteSession(sessionId: string) {
+  const db = openDb(databasePath());
+
+  try {
+    db.query("delete from sessions where id = ?").run(sessionId);
+  } finally {
+    db.close();
+  }
+}

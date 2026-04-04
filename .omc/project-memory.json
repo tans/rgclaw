@@ -1,0 +1,136 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775302916172,
+  "projectRoot": "/Users/ke/code/rgclaw",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "npm test",
+    "lintCommand": null,
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "bun run src/server/index.ts",
+      "test": "bun test",
+      "db:migrate": "bun run src/db/migrate.ts",
+      "collector": "bun run src/collectors/run.ts",
+      "worker": "bun run src/workers/run.ts"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts",
+      "src",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "WeClawBot-API": {
+      "path": "WeClawBot-API",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1775302915812,
+      "keyFiles": [
+        "Dockerfile",
+        "LICENSE",
+        "README.md",
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    "data": {
+      "path": "data",
+      "purpose": "Data files",
+      "fileCount": 1,
+      "lastAccessed": 1775302915817,
+      "keyFiles": [
+        "app.sqlite"
+      ]
+    },
+    "demo": {
+      "path": "demo",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1775302916010,
+      "keyFiles": [
+        "flap.event.ts",
+        "four.event.ts"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1775302916014,
+      "keyFiles": []
+    },
+    "logs": {
+      "path": "logs",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1775302916016,
+      "keyFiles": [
+        "rgclaw-collector.err.log",
+        "rgclaw-collector.out.log",
+        "rgclaw-web.err.log",
+        "rgclaw-web.out.log",
+        "rgclaw-worker.err.log"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 0,
+      "lastAccessed": 1775302916018,
+      "keyFiles": []
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1775302916022,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 1,
+      "lastAccessed": 1775302916026,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

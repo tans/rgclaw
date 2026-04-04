@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { buildBindInstruction } from "../../adapters/wechat-bot";
+import { getCookie } from "hono/cookie";
 import { openDb } from "../../db/sqlite";
 import { getActiveEntitlement } from "../../db/repositories/entitlements";
 import {
@@ -8,8 +8,7 @@ import {
   upsertWalletAddress,
 } from "../../db/repositories/subscriptions";
 import { getBindingByUserId } from "../../db/repositories/wechat-bindings";
-import { config } from "../../shared/config";
-import { buildWechatBindCode } from "../../shared/wechat-bind-code";
+import { findActiveChannelBindingByUserId } from "../../db/repositories/channel-bindings";
 import type { AppEnv } from "../middleware/session";
 import { renderUserCenter } from "../views/user-center";
 
@@ -28,7 +27,6 @@ export function userCenterRoutes() {
     }
 
     ensureDefaultSubscriptions(userId);
-    const bindCode = buildWechatBindCode(userId, config.wechatBindSecret);
 
     const db = openDb();
 
@@ -38,7 +36,9 @@ export function userCenterRoutes() {
         .get(userId) as UserCenterUserRecord | null;
       const entitlement = getActiveEntitlement(userId);
       const subscriptions = listSubscriptions(userId);
-      const binding = getBindingByUserId(userId);
+
+      // Check new Hub-based channel binding
+      const hubBinding = findActiveChannelBindingByUserId(userId);
 
       return c.html(
         renderUserCenter({
@@ -48,8 +48,10 @@ export function userCenterRoutes() {
           entitlementText: entitlement
             ? `${entitlement.expires_at}（${entitlement.plan_type === "trial" ? "3 天试用" : "付费"}）`
             : "暂无",
-          bindingStatusText: binding?.status === "active" ? "已绑定" : "未绑定",
-          bindInstruction: buildBindInstruction(bindCode),
+          bindingStatusText: hubBinding ? "已绑定（Hub）" : "未绑定",
+          bindInstruction: hubBinding
+            ? "已通过 OpeniLink Hub 绑定微信"
+            : "请到微信绑定页面扫码绑定",
         }),
       );
     } finally {
