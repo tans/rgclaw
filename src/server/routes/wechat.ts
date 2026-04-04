@@ -165,12 +165,7 @@ export function wechatRoutes() {
       // Subscribe to Hub WebSocket relay for this channel
       hubSubscribeChannel(bindResult.api_key, bindResult.channel_id, bindResult.bot_id);
 
-      return c.json({
-        ok: true,
-        botId: bindResult.bot_id,
-        channelId: bindResult.channel_id,
-        botName: bindResult.bot_name,
-      });
+      return c.json({ ok: true, botId: bindResult.bot_id, channelId: bindResult.channel_id, botName: bindResult.bot_name, redirectUrl: "/me?bound=1" });
     } catch (err) {
       console.error("hubConfirmBotBind failed:", err);
       return c.json({ error: "bind confirm failed" }, 502);

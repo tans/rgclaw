@@ -122,7 +122,7 @@ async function pollBindConfirm() {
     const res = await fetch("/wechat/bind/confirm", { method: "POST" });
     const data = await res.json();
     if (data.ok) {
-      location.reload();
+      location.href = data.redirectUrl || '/me?bound=1';
     }
   } catch(e) {}
   setTimeout(pollBindConfirm, 2000);
@@ -150,7 +150,7 @@ async function startBind() {
         fetch("/wechat/bind/confirm", { method: "POST" })
           .then(r => r.json())
           .then(d => {
-            if (d.ok) { location.reload(); return; }
+            if (d.ok) { location.href = d.redirectUrl || '/me?bound=1'; return; }
           })
           .catch(() => {})
           .finally(() => { setTimeout(poll, 2000); });

@@ -90,7 +90,7 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
     <p>连接微信，订阅 Four 和 Flap 的发射事件推送。新用户免费试用 3 天，之后按月或按年订阅。</p>
     <div class="cta-row">
       <a href="/auth/login" class="btn-primary">免费试用 3 天</a>
-      <a href="/auth/login" class="btn-secondary">了解定价</a>
+      <a href="/#pricing" class="btn-secondary">了解定价</a>
     </div>
   </section>
 
@@ -112,7 +112,7 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
     </div>
   </section>
 
-  <section class="pricing">
+  <section id="pricing" class="pricing">
     <div class="section-title">订阅方案</div>
     <div class="pricing-grid">
       <div class="plan">

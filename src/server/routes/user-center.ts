@@ -38,6 +38,17 @@ export function userCenterRoutes() {
       // Check new Hub-based channel binding
       const hubBinding = findActiveChannelBindingByUserId(userId);
 
+      // Detect ?bound=1 from successful WeChat bind redirect
+      const justBound = c.req.query("bound") === "1";
+
+      // Calculate trial days left
+      let trialDaysLeft: number | undefined;
+      if (entitlement?.plan_type === "trial") {
+        const expiresAt = new Date(entitlement.expires_at).getTime();
+        const now = Date.now();
+        trialDaysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+      }
+
       return c.html(
         renderUserCenter({
           email: user?.email ?? "",
@@ -48,6 +59,8 @@ export function userCenterRoutes() {
             : "暂无",
           bindingStatusText: hubBinding ? "已绑定（Hub）" : "未绑定",
           bound: !!hubBinding,
+          justBound,
+          trialDaysLeft,
         }),
       );
     } finally {

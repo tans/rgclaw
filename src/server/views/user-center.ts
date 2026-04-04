@@ -7,6 +7,8 @@ type RenderUserCenterInput = {
   entitlementText: string;
   bindingStatusText: string;
   bound: boolean;
+  justBound?: boolean;
+  trialDaysLeft?: number;
 };
 
 export function renderUserCenter(input: RenderUserCenterInput) {
@@ -47,10 +49,76 @@ export function renderUserCenter(input: RenderUserCenterInput) {
   .sub-item.on .sub-status { color: #2e7d32; }
   .section-title { font-size: 13px; color: #888; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
   a { color: #0070f0; text-decoration: none; }
+
+  /* Onboarding banner */
+  .banner { background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; color: #fff; }
+  .banner h2 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .banner p { font-size: 13px; opacity: 0.88; line-height: 1.55; margin-bottom: 14px; }
+  .banner .btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(4px); padding: 10px 20px; font-size: 14px; }
+  .banner .btn:hover { background: rgba(255,255,255,0.3); }
+  .banner.success { background: linear-gradient(135deg, #059669, #10b981); }
+  .banner.warning { background: linear-gradient(135deg, #d97706, #f59e0b); }
+
+  /* Step checklist */
+  .checklist { margin-top: 20px; }
+  .check-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 13px; }
+  .check-item:last-child { border-bottom: none; }
+  .check-icon { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; margin-top: 1px; }
+  .check-icon.done { background: rgba(255,255,255,0.25); color: #fff; }
+  .check-icon.pending { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.6); }
 </style>
 </head>
 <body>
 <div class="container">
+
+  ${input.justBound ? `
+  <div class="banner success">
+    <h2>🎉 绑定成功！</h2>
+    <p>你的微信已成功连接。从现在起，Four / Flap 发射事件会第一时间推送到你的微信。</p>
+    <div class="checklist">
+      <div class="check-item">
+        <div class="check-icon done">✓</div>
+        <div>连接微信</div>
+      </div>
+      <div class="check-item">
+        <div class="check-icon done">✓</div>
+        <div>获得 3 天免费试用</div>
+      </div>
+      <div class="check-item">
+        <div class="check-icon done">✓</div>
+        <div>订阅 Four / Flap 事件</div>
+      </div>
+    </div>
+  </div>
+  ` : !input.bound ? `
+  <div class="banner">
+    <h2>👋 欢迎使用 RgClaw！</h2>
+    <p>完成以下步骤，开始接收 Meme 发射通知：</p>
+    <div class="checklist">
+      <div class="check-item">
+        <div class="check-icon done">✓</div>
+        <div>注册账号</div>
+      </div>
+      <div class="check-item">
+        <div class="check-icon pending">2</div>
+        <div>连接 OpeniLink Hub（点击下方按钮）</div>
+      </div>
+      <div class="check-item">
+        <div class="check-icon pending">3</div>
+        <div>扫码绑定微信机器人</div>
+      </div>
+    </div>
+    <br/>
+    <a href="/wechat/bind" class="btn">立即绑定微信 →</a>
+  </div>
+  ` : input.trialDaysLeft !== undefined && input.trialDaysLeft >= 0 && input.trialDaysLeft <= 1 ? `
+  <div class="banner warning">
+    <h2>⏰ 试用即将到期</h2>
+    <p>你的 3 天免费试用还剩 ${input.trialDaysLeft === 0 ? "今天" : "最后 1 天"}。到期后将停止推送，及时续费可确保服务不中断。</p>
+    <a href="/renew" class="btn">立即续费 →</a>
+  </div>
+  ` : ""}
+
   <div class="card">
     <h1>👤 用户中心</h1>
     <div class="info-row">
