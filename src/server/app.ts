@@ -5,12 +5,16 @@ import { sessionMiddleware, type AppEnv } from "./middleware/session";
 import { authRoutes } from "./routes/auth";
 import { renewalRoutes } from "./routes/renewal";
 import { userCenterRoutes } from "./routes/user-center";
+import { webhookRoutes } from "./routes/webhook";
 import { wechatRoutes } from "./routes/wechat";
 import { renderHomePage } from "./views/home";
 
 export function createApp() {
   runMigrations(process.env.DATABASE_PATH);
   const app = new Hono<AppEnv>();
+
+  // Webhook routes first — no session cookie needed (bearer token auth)
+  app.route("/", webhookRoutes());
 
   app.use("*", sessionMiddleware);
 
