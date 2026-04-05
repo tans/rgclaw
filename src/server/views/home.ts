@@ -31,7 +31,7 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>RgClaw — Meme 发射通知</title>
+<title>Regou.app — Meme 发射通知</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
@@ -78,7 +78,7 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
 <body>
 <div class="container">
   <nav>
-    <div class="logo">Rg<span>Claw</span></div>
+    <div class="logo"><span>regou</span>.app</div>
     <div class="nav-links">
       <a href="/auth/login">登录</a>
       <a href="/me">控制台</a>
@@ -137,7 +137,7 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
 </div>
 
 <footer>
-  RgClaw · 专注于 Meme 发射通知
+  Regou.app · 专注于 Meme 发射通知
 </footer>
 </body>
 </html>`;
