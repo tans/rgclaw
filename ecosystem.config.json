@@ -1,17 +1,17 @@
 {
   "apps": [
     {
-      "name": "rgclaw-web",
-      "namespace": "rgclaw",
-      "cwd": ".",
+      "name": "regouapp-web",
+      "namespace": "regouapp",
+      "cwd": "/root/regou-app",
       "script": "src/server/index.ts",
-      "interpreter": "bun",
-      "interpreterArgs": "run",
+      "interpreter": "/root/.bun/bin/bun",
+      "interpreterArgs": "",
       "env": {
         "PORT": 30082,
         "OPENILINK_HUB_URL": "https://hub.openilink.com",
         "OPENILINK_ADMIN_URL": "https://admin.openilink.com",
-        "OPENILINK_OAUTH_CALLBACK_URL": "https://rgclaw.ali.minapp.xin/auth/callback",
+        "OPENILINK_OAUTH_CALLBACK_URL": "https://regou.app/auth/callback",
         "BSC_RPC_URL": "https://public-bsc.nownodes.io/",
         "DATABASE_PATH": "./data/app.sqlite"
       },
@@ -19,15 +19,15 @@
       "watch": false,
       "merge_logs": true,
       "time": true,
-      "out_file": "logs/rgclaw-web.out.log",
-      "error_file": "logs/rgclaw-web.err.log"
+      "out_file": "logs/regouapp-web.out.log",
+      "error_file": "logs/regouapp-web.err.log"
     },
     {
-      "name": "rgclaw-collector",
-      "namespace": "rgclaw",
-      "cwd": ".",
+      "name": "regouapp-collector",
+      "namespace": "regouapp",
+      "cwd": "/root/regou-app",
       "script": "src/collectors/run.ts",
-      "interpreter": "bun",
+      "interpreter": "/root/.bun/bin/bun",
       "interpreterArgs": "run",
       "env": {
         "BSC_RPC_URL": "https://public-bsc.nownodes.io/",
@@ -37,15 +37,15 @@
       "watch": false,
       "merge_logs": true,
       "time": true,
-      "out_file": "logs/rgclaw-collector.out.log",
-      "error_file": "logs/rgclaw-collector.err.log"
+      "out_file": "logs/regouapp-collector.out.log",
+      "error_file": "logs/regouapp-collector.err.log"
     },
     {
-      "name": "rgclaw-worker",
-      "namespace": "rgclaw",
-      "cwd": ".",
+      "name": "regouapp-worker",
+      "namespace": "regouapp",
+      "cwd": "/root/regou-app",
       "script": "src/workers/run.ts",
-      "interpreter": "bun",
+      "interpreter": "/root/.bun/bin/bun",
       "interpreterArgs": "run",
       "env": {
         "OPENILINK_HUB_URL": "https://hub.openilink.com",
@@ -55,8 +55,8 @@
       "watch": false,
       "merge_logs": true,
       "time": true,
-      "out_file": "logs/rgclaw-worker.out.log",
-      "error_file": "logs/rgclaw-worker.err.log"
+      "out_file": "logs/regouapp-worker.out.log",
+      "error_file": "logs/regouapp-worker.err.log"
     }
   ]
 }

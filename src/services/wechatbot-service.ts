@@ -1,5 +1,5 @@
 import { WeChatBot } from "@wechatbot/wechatbot";
-import type { WechatBotBinding } from "../db/repositories/wechat-bot-bindings";
+import { getAllActiveBindings, type WechatBotBinding } from "../db/repositories/wechat-bot-bindings";
 
 const activeBots = new Map<string, WeChatBot>();
 
@@ -128,15 +128,13 @@ export function clearQRStatus(userId: string): void {
 
 export function startBotForBinding(binding: WechatBotBinding): void {
   if (activeBots.has(binding.id)) return;
-  
+
   const bot = new WeChatBot({
     baseUrl: binding.base_url,
     token: binding.bot_token,
     botId: binding.bot_id,
   } as any);
-  
-  activeBots.set(binding.id, bot);
-  
+
   // Set up auto-reply for incoming messages
   (bot as any).onMessage(async (msg: any) => {
     try {
@@ -148,8 +146,15 @@ export function startBotForBinding(binding: WechatBotBinding): void {
       console.error("Auto-reply failed:", err);
     }
   });
-  
-  (bot as any).start();
+
+  // Start the bot connection. Errors (e.g., "Not logged in" from stale tokens)
+  // are caught by the bootstrap caller so the binding remains in the DB for re-binding.
+  (bot as any).start().catch((err: unknown) => {
+    console.warn(`[wechatbot] bot ${binding.id} start failed:`, err instanceof Error ? err.message : String(err));
+    activeBots.delete(binding.id);
+  });
+
+  activeBots.set(binding.id, bot);
 }
 
 export function stopBotForBinding(bindingId: string): void {
@@ -182,4 +187,28 @@ export async function sendMessage(
 
 export function getActiveBot(bindingId: string): WeChatBot | undefined {
   return activeBots.get(bindingId);
+}
+
+/**
+ * Bootstrap WebSocket subscriptions for all active WeChat bot bindings.
+ * Call once on server startup to restore in-memory bot state.
+ *
+ * Note: WeChatBot WebSocket sessions cannot survive server restarts.
+ * If startBotForBinding fails (Not logged in), the binding remains in the
+ * database but the user needs to re-bind via QR code to restore auto-reply.
+ */
+export async function bootstrapDirectWeChatBots() {
+  const bindings = getAllActiveBindings();
+  let started = 0;
+  let failed = 0;
+  for (const binding of bindings) {
+    try {
+      startBotForBinding(binding);
+      started++;
+    } catch (err) {
+      failed++;
+      console.warn(`[startup] failed to start bot for binding ${binding.id}, user may need to re-bind:`, err instanceof Error ? err.message : String(err));
+    }
+  }
+  console.log(`[startup] bootstrapped ${started}/${bindings.length} direct WeChat bots (${failed} failed - may need re-bind)`);
 }

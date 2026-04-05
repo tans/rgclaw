@@ -2,6 +2,7 @@ import {
   buildKeepaliveReminder,
   buildLaunchMessage,
   buildRenewalReminder,
+  buildGenericWechatAutoReply,
 } from "../adapters/wechat-bot";
 import {
   claimPendingNotificationJobs,
@@ -206,15 +207,34 @@ export async function dispatchPendingSystemMessages() {
     }
 
     try {
-      await sendViaHub(
-        {
-          hub_api_key: binding.hub_api_key,
-          hub_channel_id: binding.hub_channel_id,
-          bot_wechat_user_id: binding.bot_wechat_user_id ?? "", // stored in channel_bindings.bot_wechat_user_id
-          last_context_token: binding.last_context_token,
-        },
-        job.payload,
-      );
+      // Handle inbound messages: parse sender info and send auto-reply
+      if (job.message_type === "inbound") {
+        let inboundData: { from_user_id: string; content: string; msg_id: string; timestamp: string };
+        try {
+          inboundData = JSON.parse(job.payload);
+        } catch {
+          markSystemMessageJobRetried(job.id, "invalid inbound payload", job.attempt_count + 1 >= 3);
+          continue;
+        }
+
+        // Send auto-reply to the user who messaged the bot
+        await hubSendChannelMessage(binding.hub_api_key, binding.hub_channel_id, {
+          to_user_id: inboundData.from_user_id,
+          content: buildGenericWechatAutoReply(),
+          context_token: binding.last_context_token ?? undefined,
+        });
+      } else {
+        // Outbound messages (keepalive, renewal_reminder): send as-is to bot
+        await sendViaHub(
+          {
+            hub_api_key: binding.hub_api_key,
+            hub_channel_id: binding.hub_channel_id,
+            bot_wechat_user_id: binding.bot_wechat_user_id ?? "",
+            last_context_token: binding.last_context_token,
+          },
+          job.payload,
+        );
+      }
     } catch (error) {
       markSystemMessageJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
       continue;

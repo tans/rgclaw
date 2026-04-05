@@ -15,7 +15,7 @@ type RunMigrationsOptions = {
 function loadSqlMigrations(): Migration[] {
   const migrationsDir = new URL("./migrations", import.meta.url);
   const files = readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
+    .filter((f) => f.endsWith(".sql") && !f.startsWith("._"))
     .sort();
   return files.map((file) => ({
     id: file.replace(".sql", ""),
