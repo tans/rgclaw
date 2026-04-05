@@ -40,6 +40,7 @@ type LaunchContentRow = {
   title: string;
   token_address: string;
   source: string;
+  symbol?: string | null;
 };
 
 export async function processLaunchPushes() {
@@ -173,7 +174,7 @@ function getLaunchContent(launchEventId: string) {
 
   try {
     return db
-      .query("select title, token_address, source from launch_events where id = ?")
+      .query("select title, token_address, source, symbol from launch_events where id = ?")
       .get(launchEventId) as LaunchContentRow | null;
   } finally {
     db.close();
@@ -274,7 +275,7 @@ export async function dispatchPendingNotificationMessages() {
       continue;
     }
 
-    const text = buildLaunchMessage(launch.title, launch.token_address, launch.source);
+    const text = buildLaunchMessage(launch.title, launch.token_address, launch.source, launch.symbol);
 
     // Try Hub channel binding first (OAuth flow)
     const hubBinding = findActiveChannelBindingByUserId(job.user_id);

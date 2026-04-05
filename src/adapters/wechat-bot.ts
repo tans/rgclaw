@@ -55,9 +55,11 @@ export async function sendWechatMessage(input: SendWechatMessageInput) {
   return { ok: true };
 }
 
-export function buildLaunchMessage(title: string, tokenAddress: string, source: string) {
+export function buildLaunchMessage(title: string, tokenAddress: string, source: string, symbol?: string | null) {
   const sourceLabel = source === "four" ? "Four" : source === "flap" ? "Flap" : source;
-  return `🔥 ${sourceLabel} 发射\n\n${title}\n\n合约: ${tokenAddress}\n\n< https://dexscreener.com/bsc/${tokenAddress} >`;
+  const shortAddr = tokenAddress.slice(0, 8) + "..." + tokenAddress.slice(-6);
+  const displayName = symbol || shortAddr;
+  return `🔥 ${sourceLabel} 发射\n\n${displayName}\n合约: ${tokenAddress}\nDexScreener: https://dexscreener.com/bsc/${tokenAddress}`;
 }
 
 export function buildRenewalReminder(expiresAt: string) {
