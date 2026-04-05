@@ -49,3 +49,20 @@ export function upsertWalletAddress(userId: string, walletAddress: string) {
     db.close();
   }
 }
+
+export function toggleSubscription(userId: string, source: string): boolean {
+  const db = openDb();
+  try {
+    const result = db
+      .query(
+        `UPDATE user_source_subscriptions 
+         SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END,
+             updated_at = ?
+         WHERE user_id = ? AND source = ?`
+      )
+      .run(new Date().toISOString(), userId, source);
+    return result.changes > 0;
+  } finally {
+    db.close();
+  }
+}

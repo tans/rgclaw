@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { openDb } from "../../db/sqlite";
 import { getActiveEntitlement } from "../../db/repositories/entitlements";
-import { ensureDefaultSubscriptions, listSubscriptions, upsertWalletAddress, } from "../../db/repositories/subscriptions";
+import { ensureDefaultSubscriptions, listSubscriptions, upsertWalletAddress, toggleSubscription, } from "../../db/repositories/subscriptions";
 import { findActiveChannelBindingByUserId } from "../../db/repositories/channel-bindings";
 import { findActiveBindingByUserId as findDirectWechatBinding } from "../../db/repositories/wechat-bot-bindings";
 import { listLatestLaunchEvents } from "../../db/repositories/launch-events";
@@ -95,6 +95,20 @@ export function userCenterRoutes() {
       return c.text("invalid wallet", 400);
     }
     upsertWalletAddress(userId, walletAddress.trim());
+    return c.redirect("/me", 302);
+  });
+
+  app.post("/me/subscription/toggle", async (c) => {
+    const userId = c.get("sessionUserId");
+    if (!userId) {
+      return c.text("unauthorized", 401);
+    }
+    const body = await c.req.parseBody();
+    const source = body.source;
+    if (typeof source !== "string" || !["four", "flap"].includes(source)) {
+      return c.text("invalid source", 400);
+    }
+    toggleSubscription(userId, source);
     return c.redirect("/me", 302);
   });
 

@@ -70,6 +70,8 @@ create table if not exists user_source_subscriptions (
   updated_at text not null
 );
 
+create unique index if not exists idx_user_source_unique on user_source_subscriptions(user_id, source);
+
 create table if not exists user_entitlements (
   id text primary key,
   user_id text not null,

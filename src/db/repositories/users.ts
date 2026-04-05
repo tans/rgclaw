@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { openDb } from "../sqlite";
+import { ensureTrialEntitlement } from "./entitlements";
 
 export type UserRecord = {
   id: string;
@@ -134,6 +135,7 @@ export function upsertUserByHubUserId(hubUserId: string, email: string) {
     db.query(
       "insert into users (id, email, password_hash, hub_user_id, wallet_address, wallet_address_updated_at, created_at, updated_at) values (?, ?, '', ?, null, null, ?, ?)",
     ).run(id, email, hubUserId, now, now);
+    ensureTrialEntitlement(id);
     return id;
   } finally {
     db.close();

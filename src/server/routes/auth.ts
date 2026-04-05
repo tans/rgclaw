@@ -3,6 +3,7 @@ import { setCookie, getCookie } from "hono/cookie";
 import { openDb } from "../../db/sqlite";
 import { createSession } from "../../db/repositories/sessions";
 import { upsertUserByWalletAddress, findUserByWallet } from "../../db/repositories/users";
+import { ensureTrialEntitlement } from "../../db/repositories/entitlements";
 import { renderLoginPage } from "../views/login";
 import type { AppEnv } from "../middleware/session";
 
@@ -60,6 +61,7 @@ export function authRoutes() {
 
     // Upsert user by wallet address
     const userId = upsertUserByWalletAddress(wallet);
+    ensureTrialEntitlement(userId);
     if (!userId) {
       return c.text("登录失败，请重试", 500);
     }

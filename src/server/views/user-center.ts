@@ -27,10 +27,13 @@ function formatSource(source: string): string {
 export function renderUserCenter(input: RenderUserCenterInput) {
   const subscriptionItems = input.subscriptions
     .map(
-      (s) => `<div class="sub-item ${s.enabled ? "on" : "off"}">
-  <span class="sub-source" title="${s.source}">${formatSource(s.source)}</span>
-  <span class="sub-status">${s.enabled ? "已开启" : "已关闭"}</span>
-</div>`,
+      (s) => `<form method="post" action="/me/subscription/toggle" class="sub-item-form">
+      <input type="hidden" name="source" value="${s.source}" />
+      <button type="submit" class="sub-item ${s.enabled ? "on" : "off"}">
+        <span class="sub-source" title="${s.source}">${formatSource(s.source)}</span>
+        <span class="sub-status">${s.enabled ? "已开启 ✓" : "已关闭"}</span>
+      </button>
+    </form>`,
     )
     .join("");
 
@@ -131,6 +134,25 @@ export function renderUserCenter(input: RenderUserCenterInput) {
     }
     .sub-status { font-size: 13px; color: #888; }
     .sub-item.on .sub-status { color: #2e7d32; }
+    .sub-item-form {
+      margin: 0;
+      padding: 0;
+    }
+    .sub-item-form button {
+      width: 100%;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      font-size: inherit;
+    }
+    .sub-item-form button:hover {
+      background: #f9f9f9;
+    }
+    .sub-item-form button:active {
+      background: #f0f0f0;
+    }
     .section-title {
       font-size: 13px;
       color: #888;
