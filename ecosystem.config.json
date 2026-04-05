@@ -9,9 +9,6 @@
       "interpreterArgs": "",
       "env": {
         "PORT": 30082,
-        "OPENILINK_HUB_URL": "https://hub.openilink.com",
-        "OPENILINK_ADMIN_URL": "https://admin.openilink.com",
-        "OPENILINK_OAUTH_CALLBACK_URL": "https://regou.app/auth/callback",
         "BSC_RPC_URL": "https://public-bsc.nownodes.io/",
         "DATABASE_PATH": "./data/app.sqlite"
       },
@@ -48,7 +45,6 @@
       "interpreter": "/root/.bun/bin/bun",
       "interpreterArgs": "run",
       "env": {
-        "OPENILINK_HUB_URL": "https://hub.openilink.com",
         "DATABASE_PATH": "./data/app.sqlite"
       },
       "autorestart": true,

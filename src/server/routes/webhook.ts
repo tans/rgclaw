@@ -12,7 +12,7 @@ export function webhookRoutes() {
   app.post("/webhook/bsc/transfer", async (c) => {
     // Bearer token auth
     if (WEBHOOK_SECRET) {
-      const authHeader = c.req.headers.get("authorization") ?? "";
+      const authHeader = c.req.header("authorization") ?? "";
       const token = authHeader.replace(/^Bearer\s+/i, "").trim();
       if (token !== WEBHOOK_SECRET) {
         return c.json({ ok: false, error: "unauthorized" }, 401);

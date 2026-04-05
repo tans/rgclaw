@@ -23,9 +23,6 @@ type SendWechatMessageInput = {
   contextToken?: string | null;
 };
 
-/**
- * @deprecated This calls the removed WeClawBot-API. Use Hub channel send via openilink/client instead.
- */
 export async function sendWechatMessage(input: SendWechatMessageInput) {
   const baseUrl = config.wechatBotApiBaseUrl.replace(/\/+$/, "");
   const endpoint = `${baseUrl}/bots/${encodeURIComponent(input.botId)}/messages`;

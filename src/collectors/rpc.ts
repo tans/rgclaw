@@ -22,6 +22,7 @@ export type RpcLog = {
   blockTimestamp?: string;
   data: string;
   topics: string[];
+  args?: Record<string, string | undefined>;
 };
 
 type RpcClient = {

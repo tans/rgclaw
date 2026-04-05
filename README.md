@@ -185,7 +185,5 @@ SCRIPT
 | `PORT` | `30082` | web 服务端口 |
 | `BSC_RPC_URL` | `https://public-bsc.nownodes.io/` | BSC RPC |
 | `DATABASE_PATH` | `./data/app.sqlite` | SQLite 数据库路径 |
-| `OPENILINK_HUB_URL` | `https://hub.openilink.com` | OpenILink Hub |
-| `OPENILINK_OAUTH_CALLBACK_URL` | `https://regou.app/auth/callback` | OAuth 回调 |
 
 如需修改端口，同步修改 `ecosystem.config.json` 中的 `PORT` 和 1Panel 反向代理端口。

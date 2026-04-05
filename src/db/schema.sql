@@ -123,25 +123,6 @@ create table if not exists payment_records (
   created_at text not null
 );
 
-create table if not exists channel_bindings (
-  id text primary key,
-  user_id text not null,
-  hub_bot_id text not null,
-  hub_channel_id text not null,
-  hub_api_key text not null,
-  bot_wechat_user_id text,
-  last_context_token text,
-  status text not null default 'active',
-  bound_at text not null,
-  hub_outbound_at text,
-  hub_keepalive_sent_at text,
-  created_at text not null,
-  updated_at text not null
-);
-
-create unique index if not exists idx_channel_bindings_active_user on channel_bindings (user_id) where status = 'active';
-create unique index if not exists idx_channel_bindings_bot_channel on channel_bindings (hub_bot_id, hub_channel_id) where status = 'active';
-
 create table if not exists wechat_bot_bindings (
   id text primary key,
   user_id text not null unique,
@@ -158,11 +139,11 @@ create table if not exists wechat_bot_bindings (
   updated_at text not null
 );
 
-create unique index if not exists idx_wechat_bot_active_user 
-  on wechat_bot_bindings (user_id) 
+create unique index if not exists idx_wechat_bot_active_user
+  on wechat_bot_bindings (user_id)
   where status = 'active';
 
-create index if not exists idx_wechat_bot_status 
+create index if not exists idx_wechat_bot_status
   on wechat_bot_bindings (status);
 
 create table if not exists wechat_inbound_queue (
@@ -179,9 +160,9 @@ create table if not exists wechat_inbound_queue (
   created_at text not null
 );
 
-create index if not exists idx_wechat_queue_binding 
+create index if not exists idx_wechat_queue_binding
   on wechat_inbound_queue (binding_id, processed);
 
-create index if not exists idx_wechat_queue_pending 
-  on wechat_inbound_queue (processed, received_at) 
+create index if not exists idx_wechat_queue_pending
+  on wechat_inbound_queue (processed, received_at)
   where processed = 0;

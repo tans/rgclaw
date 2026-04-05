@@ -15,15 +15,6 @@ export const config = {
   priceUnitWei: "5000000000000000",
   trialDays: 3,
   reminderLeadDays: 1,
-  get openilinkHubUrl() {
-    return process.env.OPENILINK_HUB_URL ?? "https://hub.openilink.com";
-  },
-  get openilinkAdminUrl() {
-    return process.env.OPENILINK_ADMIN_URL ?? "https://admin.openilink.com";
-  },
-  get openilinkOAuthCallbackUrl() {
-    return process.env.OPENILINK_OAUTH_CALLBACK_URL ?? "http://localhost:3000/auth/callback";
-  },
   get wechatBotApiBaseUrl() {
     return process.env.WECHAT_BOT_API_BASE_URL ?? "https://example.invalid/wechat";
   },

@@ -2,8 +2,7 @@ import { Hono } from "hono";
 import { openDb } from "../../db/sqlite";
 import { getActiveEntitlement } from "../../db/repositories/entitlements";
 import { ensureDefaultSubscriptions, listSubscriptions, upsertWalletAddress, toggleSubscription, } from "../../db/repositories/subscriptions";
-import { findActiveChannelBindingByUserId } from "../../db/repositories/channel-bindings";
-import { findActiveBindingByUserId as findDirectWechatBinding } from "../../db/repositories/wechat-bot-bindings";
+import { findActiveBindingByUserId } from "../../db/repositories/wechat-bot-bindings";
 import { listLatestLaunchEvents } from "../../db/repositories/launch-events";
 import { sendMessage, getActiveBot } from "../../services/wechatbot-service";
 import type { AppEnv } from "../middleware/session";
@@ -33,16 +32,10 @@ export function userCenterRoutes() {
       const subscriptions = listSubscriptions(userId);
       const recentEvents = listLatestLaunchEvents(10);
 
-      // Check old Hub-based channel binding
-      const hubBinding = findActiveChannelBindingByUserId(userId);
-      
-      // Check new direct WeChat Bot binding
-      const directBinding = findDirectWechatBinding(userId);
+      const directBinding = findActiveBindingByUserId(userId);
 
-      // Detect ?bound=1 from successful WeChat bind redirect
       const justBound = c.req.query("bound") === "1";
 
-      // Calculate trial days left
       let trialDaysLeft: number | undefined;
       if (entitlement?.plan_type === "trial") {
         const expiresAt = new Date(entitlement.expires_at).getTime();
@@ -50,14 +43,11 @@ export function userCenterRoutes() {
         trialDaysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
       }
 
-      // Determine binding status text
       let bindingStatusText: string;
-      const isBound = !!hubBinding || !!directBinding;
-      
+      const isBound = !!directBinding;
+
       if (directBinding) {
         bindingStatusText = "已绑定（微信）";
-      } else if (hubBinding) {
-        bindingStatusText = "已绑定（Hub）";
       } else {
         bindingStatusText = "未绑定";
       }
@@ -120,7 +110,7 @@ export function userCenterRoutes() {
     if (!userId) {
       return c.text("unauthorized", 401);
     }
-    const binding = findDirectWechatBinding(userId);
+    const binding = findActiveBindingByUserId(userId);
     if (!binding) {
       return c.json({ error: "未绑定微信" }, 400);
     }
@@ -131,7 +121,6 @@ export function userCenterRoutes() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("send message failed:", msg);
-      // Distinguish "bot inactive" (needs re-bind) from transient errors
       if (msg.startsWith("WECHAT_BOT_INACTIVE:")) {
         return c.json({ error: "微信机器人已离线，请重新绑定" }, 409);
       }
@@ -145,19 +134,12 @@ export function userCenterRoutes() {
     if (!userId) {
       return c.json({ error: "unauthorized" }, 401);
     }
-    const directBinding = findDirectWechatBinding(userId);
-    const hubBinding = findActiveChannelBindingByUserId(userId);
-    const binding = directBinding ?? hubBinding;
+    const binding = findActiveBindingByUserId(userId);
     if (!binding) {
       return c.json({ bound: false, online: false });
     }
-    // For direct WeChat bindings, check activeBots Map
-    if (directBinding) {
-      const bot = getActiveBot(directBinding.id);
-      return c.json({ bound: true, online: !!bot, type: "wechat" });
-    }
-    // For Hub bindings, assume online (Hub manages the connection)
-    return c.json({ bound: true, online: true, type: "hub" });
+    const bot = getActiveBot(binding.id);
+    return c.json({ bound: true, online: !!bot, type: "wechat" });
   });
 
   return app;

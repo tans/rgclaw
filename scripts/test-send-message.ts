@@ -2,69 +2,70 @@
  * Test script: send a WeChat message to 268bcf362c88@im.bot (dev)
  *
  * Usage:
- *   # Option 1: bun run scripts/test-send-message.ts <hub_api_key> <hub_channel_id>
- *   bun run scripts/test-send-message.ts sk_xxx channel_xxx
+ *   bun run scripts/test-send-message.ts
  *
- *   # Option 2: Set env vars and run without args
- *   HUB_API_KEY=sk_xxx HUB_CHANNEL_ID=channel_xxx bun run scripts/test-send-message.ts
- *
- * Prerequisites (one of the above):
- *   - Bot 268bcf362c88 is already logged in and bound
- *   - Active channel binding exists in channel_bindings table
- *   - HUB_API_KEY and HUB_CHANNEL_ID env vars are set
+ * Credentials and context token are read from the server's /root/.wechatbot/ storage.
+ * Must be run on the server (or with SSH access to /root/.wechatbot/).
  */
 
-import { hubSendChannelMessage } from "../src/openilink/client";
-import { config } from "../src/shared/config";
+import { WeChatBot } from "@wechatbot/wechatbot";
+import { readFileSync } from "fs";
 
-const TARGET_USER_ID = "268bcf362c88@im.bot";
-
-function getArgs(): { apiKey: string; channelId: string } {
-  // Priority 1: command-line args
-  if (process.argv.length >= 4) {
-    return { apiKey: process.argv[2], channelId: process.argv[3] };
-  }
-
-  // Priority 2: env vars
-  const apiKey = process.env.HUB_API_KEY;
-  const channelId = process.env.HUB_CHANNEL_ID;
-  if (apiKey && channelId) {
-    return { apiKey, channelId };
-  }
-
-  console.error("[test] Usage:");
-  console.error("  bun run scripts/test-send-message.ts <hub_api_key> <hub_channel_id>");
-  console.error("  or set HUB_API_KEY and HUB_CHANNEL_ID env vars");
-  process.exit(1);
-  throw new Error("unreachable");
-}
+const TARGET_USER = "268bcf362c88@im.bot";
+const MESSAGE = "测试 from regou.app " + new Date().toISOString();
 
 async function main() {
-  const { apiKey, channelId } = getArgs();
-  const testMessage = "Hello from test script! 时间: " + new Date().toISOString();
+  // Read credentials from the bot's storage
+  const credsPath = "/root/.wechatbot/credentials.json";
+  const ctxPath = "/root/.wechatbot/context_tokens.json";
 
-  console.log("[test] Target user:", TARGET_USER_ID);
-  console.log("[test] Hub URL:", config.openilinkHubUrl);
-  console.log("[test] Channel ID:", channelId);
-  console.log("[test] Message:", testMessage);
+  const creds: {
+    token: string;
+    baseUrl: string;
+    accountId: string;
+    userId: string;
+  } = JSON.parse(readFileSync(credsPath, "utf-8"));
+
+  const contextTokens: Record<string, string> = JSON.parse(readFileSync(ctxPath, "utf-8"));
+  const contextToken = contextTokens[creds.userId];
+
+  if (!contextToken) {
+    console.error("[test] No context token found for user:", creds.userId);
+    process.exit(1);
+  }
+
+  console.log("[test] Target:", TARGET_USER);
+  console.log("[test] Bot userId:", creds.userId);
+  console.log("[test] Message:", MESSAGE);
+
+  const bot = new WeChatBot({
+    baseUrl: creds.baseUrl,
+    token: creds.token,
+    botId: creds.accountId,
+    accountId: creds.accountId,
+    storage: "file",
+    storageDir: "/root/.wechatbot",
+  } as any);
 
   try {
-    const result = await hubSendChannelMessage(apiKey, channelId, {
-      to_user_id: TARGET_USER_ID,
-      content: testMessage,
-      context_token: undefined,
-    });
+    await (bot as any).login();
+    console.log("[test] Logged in");
 
-    console.log("\n[test] Result:", JSON.stringify(result, null, 2));
-    if (result.success) {
-      console.log("[test] SUCCESS: Message sent to", TARGET_USER_ID);
-    } else {
-      console.error("[test] FAILED: server returned success=false");
-      process.exit(1);
-    }
+    // Use sendText which properly resolves context token
+    await (bot as any).sender.sendText(
+      creds.baseUrl,
+      creds.token,
+      creds.userId, // send to self
+      MESSAGE,
+      contextToken
+    );
+
+    console.log("\n[test] SUCCESS:", MESSAGE);
   } catch (err) {
     console.error("[test] FAILED:", err instanceof Error ? err.message : String(err));
     process.exit(1);
+  } finally {
+    try { (bot as any).stop?.(); } catch {}
   }
 }
 

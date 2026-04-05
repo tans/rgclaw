@@ -6,7 +6,6 @@ import { authRoutes } from "./routes/auth";
 import { renewalRoutes } from "./routes/renewal";
 import { userCenterRoutes } from "./routes/user-center";
 import { webhookRoutes } from "./routes/webhook";
-import { wechatRoutes } from "./routes/wechat";
 import { wechatDirectRoutes } from "./routes/wechat-direct";
 import { eventsRoutes } from "./routes/events";
 import { renderHomePage } from "./views/home";
@@ -18,7 +17,7 @@ export function createApp() {
 
   // Webhook routes first — no session cookie needed (bearer token auth)
   app.route("/", webhookRoutes());
-  
+
   // Public API routes — no session needed
   app.route("/", eventsRoutes());
 
@@ -31,7 +30,6 @@ export function createApp() {
   app.route("/", authRoutes());
   app.route("/", userCenterRoutes());
   app.route("/", renewalRoutes());
-  app.route("/", wechatRoutes());
   app.route("/", wechatDirectRoutes());
 
   return app;
