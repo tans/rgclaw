@@ -1,5 +1,5 @@
 {
-  "name": "rgclaw",
+  "name": "regou-app",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,8 @@
     "test": "bun test",
     "db:migrate": "bun run src/db/migrate.ts",
     "collector": "bun run src/collectors/run.ts",
-    "worker": "bun run src/workers/run.ts"
+    "worker": "bun run src/workers/run.ts",
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@wechatbot/wechatbot": "^2.0.1",
