@@ -139,13 +139,17 @@ export function markNotificationJobSent(id: string, sentAt: string) {
   }
 }
 
-export function markNotificationJobRetried(id: string, error: string, failed: boolean) {
+export function markNotificationJobRetried(id: string, error: string, giveUp: boolean) {
   const db = openDb();
 
   try {
+    // Keep jobs in 'pending' so they retry on the next worker cycle.
+    // Only transition to 'failed' for permanent errors (e.g. binding gone).
+    // This ensures messages eventually deliver when the bot recovers.
+    const newStatus = giveUp ? "failed" : "pending";
     db.query(
       "update notification_jobs set status = ?, attempt_count = attempt_count + 1, last_error = ? where id = ?",
-    ).run(failed ? "failed" : "pending", error, id);
+    ).run(newStatus, error, id);
   } finally {
     db.close();
   }

@@ -269,7 +269,8 @@ export async function dispatchPendingNotificationMessages() {
   for (const job of jobs) {
     const launch = getLaunchContent(job.launch_event_id);
     if (!launch) {
-      markNotificationJobRetried(job.id, "launch event missing", job.attempt_count + 1 >= 3);
+      // Launch event deleted — permanent failure
+      markNotificationJobRetried(job.id, "launch event missing", true);
       continue;
     }
 
@@ -294,7 +295,10 @@ export async function dispatchPendingNotificationMessages() {
         sent += 1;
         continue;
       } catch (error) {
-        markNotificationJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
+        // Bot inactive or Hub error — keep retrying (bot will recover)
+        const msg = getErrorMessage(error);
+        const giveUp = msg.startsWith("binding missing");
+        markNotificationJobRetried(job.id, msg, giveUp);
         continue;
       }
     }
@@ -310,13 +314,16 @@ export async function dispatchPendingNotificationMessages() {
         sent += 1;
         continue;
       } catch (error) {
-        markNotificationJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
+        // Bot session inactive or network error — keep retrying until bot recovers
+        const msg = getErrorMessage(error);
+        const giveUp = msg.startsWith("binding missing"); // binding gone = permanent
+        markNotificationJobRetried(job.id, msg, giveUp);
         continue;
       }
     }
 
-    // No binding found
-    markNotificationJobRetried(job.id, "binding missing", job.attempt_count + 1 >= 3);
+    // No binding found — permanent failure
+    markNotificationJobRetried(job.id, "binding missing", true);
   }
 
   return sent;
