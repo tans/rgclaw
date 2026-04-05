@@ -48,7 +48,7 @@ export function createBinding(params: {
   const now = new Date().toISOString();
   try {
     db.query(`
-      INSERT INTO wechat_bot_bindings 
+      INSERT OR REPLACE INTO wechat_bot_bindings
         (id, user_id, bot_token, bot_id, account_id, user_wx_id, base_url, status, bound_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
     `).run(

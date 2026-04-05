@@ -251,29 +251,21 @@ export function renderUserCenter(input: RenderUserCenterInput) {
   </style>
 </head>
 <body>
+  <nav style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;margin-bottom:16px;background:#fff;">
+    <a href="/" style="font-size:16px;font-weight:700;color:#333;text-decoration:none;"><span style="color:rgb(7,193,96)">regou</span>.app</a>
+    <form method="POST" action="/logout" style="margin:0;">
+      <button type="submit" style="background:none;border:none;color:#888;font-size:13px;cursor:pointer;">登出</button>
+    </form>
+  </nav>
   <div class="container">
     ${input.justBound ? `
     <div class="banner success">
       <h2>🎉 绑定成功！</h2>
       <p>你的微信已成功连接。从现在起，Four / Flap 发射事件会第一时间推送到你的微信。</p>
-      <div class="checklist">
-        <div class="check-item">
-          <div class="check-icon done">✓</div>
-          <div>连接微信</div>
-        </div>
-        <div class="check-item">
-          <div class="check-icon done">✓</div>
-          <div>获得 3 天免费试用</div>
-        </div>
-        <div class="check-item">
-          <div class="check-icon done">✓</div>
-          <div>订阅 Four / Flap 事件</div>
-        </div>
-      </div>
     </div>
     ` : !input.bound ? `
     <div class="banner">
-      <h2>👋 欢迎使用 RgClaw！</h2>
+      <h2>👋 欢迎使用 Regou.app！</h2>
       <p>完成以下步骤，开始接收 Meme 发射通知：</p>
       <div class="checklist">
         <div class="check-item">
@@ -301,42 +293,56 @@ export function renderUserCenter(input: RenderUserCenterInput) {
     ` : ""}
 
     <div class="card">
-      <h1>👤 用户中心</h1>
       <div class="info-row">
-        <span class="info-label">钱包地址</span>
-        <span class="info-value" style="font-size:12px;font-family:monospace">${input.walletAddress || "<a href='/renew'>去填写</a>"}</span>
+        <span class="info-label">钱包</span>
+        <span class="info-value" style="font-size:12px;font-family:monospace">${input.walletAddress ? input.walletAddress.slice(0,8)+"..."+input.walletAddress.slice(-6) : "未填写"}</span>
       </div>
       <div class="info-row">
-        <span class="info-label">微信绑定</span>
-        <span class="info-value">
-          ${input.bound ? `<span class="badge">✅ 已绑定</span>` : `<span class="badge warn">⚠️ 未绑定</span> <a href="/wechat/direct/bind">去绑定 →</a>`}
-        </span>
+        <span class="info-label">微信</span>
+        <span class="info-value">${input.bound ? "✅ 已绑定" : "⚠️ 未绑定"}</span>
       </div>
       <div class="info-row">
-        <span class="info-label">订阅状态</span>
+        <span class="info-label">订阅</span>
         <span class="info-value">${input.entitlementText}</span>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="section-title">最近发射事件</div>
-      <div class="events">
-        ${recentEventsHtml}
+      <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;justify-content:center;">
+        ${input.bound ? `<button id="sendMsgBtn" class="btn" style="background:rgb(7,193,96);flex:1;text-align:center;">发送消息</button>` : ""}
+        <a href="/wechat/direct/bind" class="btn" style="background:#f0f0f0;color:#333;flex:1;text-align:center;">${input.bound ? "重新绑定" : "绑定微信"}</a>
+        <a href="/renew" class="btn" style="background:#f0f0f0;color:#333;flex:1;text-align:center;">续费</a>
       </div>
     </div>
 
+    ${input.bound ? `
+    <script>
+    document.getElementById("sendMsgBtn")?.addEventListener("click", async () => {
+      const btn = document.getElementById("sendMsgBtn");
+      if (!btn) return;
+      btn.disabled = true;
+      btn.textContent = "发送中...";
+      try {
+        const res = await fetch("/me/send-message", { method: "POST" });
+        const data = await res.json();
+        if (data.ok) {
+          btn.textContent = "已发送 " + data.emoji;
+          setTimeout(() => { btn.textContent = "发送消息"; btn.disabled = false; }, 1500);
+        } else {
+          btn.textContent = data.error || "发送失败";
+          setTimeout(() => { btn.textContent = "发送消息"; btn.disabled = false; }, 1500);
+        }
+      } catch {
+        btn.textContent = "发送失败";
+        setTimeout(() => { btn.textContent = "发送消息"; btn.disabled = false; }, 1500);
+      }
+    });
+    </script>
+    ` : ""}
+
+    ${input.bound ? `
     <div class="card">
-      <div class="section-title">事件来源</div>
+      <div class="section-title">监听事件</div>
       ${subscriptionItems || "<p style='color:#888;font-size:13px;'>暂无订阅</p>"}
     </div>
-
-    <div class="card">
-      <div class="section-title">快捷操作</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <a href="/wechat/direct/bind" class="btn">${input.bound ? "查看绑定" : "绑定微信"}</a>
-        <a href="/renew" class="btn" style="background:#f0f0f0;color:#333;">续费</a>
-      </div>
-    </div>
+    ` : ""}
   </div>
 </body>
 </html>`;

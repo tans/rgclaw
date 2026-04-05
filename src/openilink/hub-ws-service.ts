@@ -3,10 +3,10 @@
  *
  * Each active Hub channel binding gets its own WS subscription. When the Hub
  * Relay broadcasts inbound WeChat messages (user texts the Bot), this service
- * receives them and enqueues a system message job for rgclaw to process.
+ * receives them and enqueues a system message job for regou.app to process.
  *
  * Architecture:
- *   Go WeClawBot-API  →  Hub Relay Hub  →  HubWSService (rgclaw)
+ *   Go WeClawBot-API  →  Hub Relay Hub  →  HubWSService (regou.app)
  *                                            ↓
  *                                      system_message_job (type: inbound)
  */
@@ -73,7 +73,7 @@ function onHubDisconnect(apiKey: string, channelId: string, reason: string) {
 }
 
 /**
- * Subscribe rgclaw to a Hub channel's WebSocket relay.
+ * Subscribe regou.app to a Hub channel's WebSocket relay.
  * Safe to call multiple times — HubWsConnectionPool ref-counts connections.
  */
 export function hubSubscribeChannel(apiKey: string, channelId: string, botId: string) {

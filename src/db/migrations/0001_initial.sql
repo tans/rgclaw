@@ -5,6 +5,7 @@ create table if not exists users (
   id text primary key,
   email text,
   password_hash text,
+  hub_user_id text,
   wallet_address text unique,
   wallet_address_updated_at text,
   created_at text not null,

@@ -4,7 +4,7 @@ export function renderLoginPage() {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>登录 - RgClaw</title>
+  <title>登录 - Regou.app</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -71,7 +71,7 @@ export function renderLoginPage() {
 </head>
 <body>
   <div class="card">
-    <h1>登录 RgClaw</h1>
+    <h1>登录 Regou.app</h1>
     <p class="subtitle">连接钱包即可登录，无需密码</p>
     
     <div id="error-msg" class="error"></div>

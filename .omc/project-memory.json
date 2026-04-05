@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "lastScanned": 1775302916172,
-  "projectRoot": "/Users/ke/code/rgclaw",
+  "projectRoot": "/Users/ke/code/regou-app",
   "techStack": {
     "languages": [
       {
@@ -102,11 +102,11 @@
       "fileCount": 6,
       "lastAccessed": 1775302916016,
       "keyFiles": [
-        "rgclaw-collector.err.log",
-        "rgclaw-collector.out.log",
-        "rgclaw-web.err.log",
-        "rgclaw-web.out.log",
-        "rgclaw-worker.err.log"
+        "regou-app-collector.err.log",
+        "regou-app-collector.out.log",
+        "regou-app-web.err.log",
+        "regou-app-web.out.log",
+        "regou-app-worker.err.log"
       ]
     },
     "scripts": {

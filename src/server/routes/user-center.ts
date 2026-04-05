@@ -5,6 +5,7 @@ import { ensureDefaultSubscriptions, listSubscriptions, upsertWalletAddress, tog
 import { findActiveChannelBindingByUserId } from "../../db/repositories/channel-bindings";
 import { findActiveBindingByUserId as findDirectWechatBinding } from "../../db/repositories/wechat-bot-bindings";
 import { listLatestLaunchEvents } from "../../db/repositories/launch-events";
+import { sendMessage } from "../../services/wechatbot-service";
 import type { AppEnv } from "../middleware/session";
 import { renderUserCenter } from "../views/user-center";
 
@@ -110,6 +111,27 @@ export function userCenterRoutes() {
     }
     toggleSubscription(userId, source);
     return c.redirect("/me", 302);
+  });
+
+  const EMOJIS = ["😀", "😂", "🥳", "🎉", "🔥", "🚀", "💪", "❤️", "👍", "🎯", "✨", "🌟", "💎", "🍀", "🎪"];
+
+  app.post("/me/send-message", async (c) => {
+    const userId = c.get("sessionUserId");
+    if (!userId) {
+      return c.text("unauthorized", 401);
+    }
+    const binding = findDirectWechatBinding(userId);
+    if (!binding) {
+      return c.json({ error: "未绑定微信" }, 400);
+    }
+    const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+    try {
+      await sendMessage(binding, binding.user_wx_id, emoji);
+      return c.json({ ok: true, emoji });
+    } catch (err) {
+      console.error("send message failed:", err);
+      return c.json({ error: "发送失败" }, 500);
+    }
   });
 
   return app;

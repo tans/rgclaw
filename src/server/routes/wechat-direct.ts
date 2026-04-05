@@ -3,7 +3,7 @@ import { getCookie } from "hono/cookie";
 import QRCode from "qrcode";
 import { findSession } from "../../db/repositories/sessions";
 import { findActiveBindingByUserId, createBinding, deactivateBinding } from "../../db/repositories/wechat-bot-bindings";
-import { startQRLogin, getQRStatus, clearQRStatus, startBotForBinding } from "../../services/wechatbot-service";
+import { startQRLogin, getQRStatus, clearQRStatus, startBotForBinding, stopBotForBinding, deleteBotStorage } from "../../services/wechatbot-service";
 import type { AppEnv } from "../middleware/session";
 
 export function wechatDirectRoutes() {
@@ -53,7 +53,7 @@ export function wechatDirectRoutes() {
         });
         const newBinding = findActiveBindingByUserId(userId);
         if (newBinding) {
-          startBotForBinding(newBinding);
+          await startBotForBinding(newBinding);
         }
         clearQRStatus(userId);
         return c.json({ status: "bound", redirect: "/wechat/direct/bind" });
@@ -66,8 +66,24 @@ export function wechatDirectRoutes() {
     const userId = c.get("sessionUserId");
     if (!userId) return c.json({ error: "未登录" }, 401);
     const binding = findActiveBindingByUserId(userId);
-    if (binding) deactivateBinding(binding.id);
+    if (binding) {
+      stopBotForBinding(binding.id);
+      deactivateBinding(binding.id);
+    }
     return c.json({ ok: true });
+  });
+
+  // POST /wechat/direct/bind/reconnect - 删除本地存储，重新扫码绑定
+  app.post("/wechat/direct/bind/reconnect", async (c) => {
+    const userId = c.get("sessionUserId");
+    if (!userId) return c.json({ error: "未登录" }, 401);
+    const binding = findActiveBindingByUserId(userId);
+    if (!binding) return c.json({ error: "未绑定" }, 400);
+    // 删除本地存储并停掉 bot
+    await deleteBotStorage(binding.id);
+    // 在数据库中标记为未绑定
+    deactivateBinding(binding.id);
+    return c.json({ ok: true, redirect: "/wechat/direct/bind" });
   });
 
   return app;
@@ -79,7 +95,7 @@ function renderBindPage() {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>绑定微信 - RgClaw</title>
+  <title>绑定微信 - Regou.app</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
@@ -179,19 +195,25 @@ function renderBoundPage(binding: { bot_id: string; bound_at: string }) {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>微信已绑定 - RgClaw</title>
+  <title>微信已绑定 - Regou.app</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; position: absolute; top: 20px; left: 24px; }
+    .logo span { color: rgb(7, 193, 96); }
     .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 40px; width: 100%; max-width: 400px; text-align: center; }
     h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
     .success-icon { width: 64px; height: 64px; background: rgba(7, 193, 96, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 32px; }
     .info { color: #666; font-size: 14px; margin-bottom: 8px; }
     .info-value { color: #fff; font-weight: 500; }
     .back-link { display: block; margin-top: 24px; color: rgb(7, 193, 96); text-decoration: none; font-size: 14px; }
+    .btn { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px 20px; font-size: 14px; cursor: pointer; margin-top: 12px; width: 100%; }
+    .btn:hover { background: rgba(255,255,255,0.12); }
+    #reconnectMsg { font-size: 12px; margin-top: 8px; color: #888; }
   </style>
 </head>
 <body>
+  <div class="logo"><span>regou</span>.app</div>
   <div class="card">
     <div class="success-icon">✓</div>
     <h1>绑定成功</h1>
@@ -200,8 +222,34 @@ function renderBoundPage(binding: { bot_id: string; bound_at: string }) {
     <p class="info" style="margin-top:16px;">绑定时间</p>
     <p class="info-value">${new Date(binding.bound_at).toLocaleString('zh-CN')}</p>
     <p style="color:#888;font-size:13px;margin-top:24px;">你将收到 Four 和 Flap 的发射事件通知</p>
+    <button id="reconnectBtn" class="btn">重新连接</button>
+    <p id="reconnectMsg"></p>
     <a href="/me" class="back-link">返回用户中心</a>
   </div>
+  <script>
+    document.getElementById('reconnectBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('reconnectBtn');
+      const msg = document.getElementById('reconnectMsg');
+      btn.disabled = true;
+      btn.textContent = '请稍候...';
+      try {
+        const res = await fetch('/wechat/direct/bind/reconnect', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          msg.textContent = '正在跳转扫码页面...';
+          setTimeout(() => location.href = data.redirect || '/wechat/direct/bind', 500);
+        } else {
+          msg.textContent = data.error || '操作失败';
+          btn.textContent = '重新连接';
+          btn.disabled = false;
+        }
+      } catch {
+        msg.textContent = '操作失败';
+        btn.textContent = '重新连接';
+        btn.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>`;
 }

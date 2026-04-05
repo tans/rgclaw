@@ -28,6 +28,13 @@ export function renderRenewalPage(props: {
   .wallet-box { background: #fff8e6; border: 1px solid #ffe082; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
   .wallet-box .label { font-size: 12px; color: #92600a; margin-bottom: 6px; font-weight: 600; }
   .wallet-box .address { font-size: 13px; font-family: monospace; color: #333; word-break: break-all; }
+  .wallet-box .address-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .wallet-box .address-row .address { flex: 1; min-width: 200px; }
+  .copy-btn { background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+  .copy-btn:hover { background: #c8e6c9; }
+  .copy-btn.copied { background: #4caf50; color: #fff; border-color: #4caf50; }
+  .explorer-link { background: #e3f2fd; border: 1px solid #bbdefb; border-radius: 6px; padding: 6px 10px; font-size: 14px; text-decoration: none; transition: background 0.2s; }
+  .explorer-link:hover { background: #bbdefb; }
   .wallet-form { margin-bottom: 8px; }
   input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: monospace; box-sizing: border-box; }
   input[type="text"]:focus { outline: none; border-color: #0070f0; }
@@ -83,7 +90,11 @@ export function renderRenewalPage(props: {
 
     <div class="wallet-box">
       <div class="label">📦 付款地址（向此地址转账）</div>
-      <div class="address">${config.bnbCollectionWallet}</div>
+      <div class="address-row">
+        <span class="address" id="payAddr">${config.bnbCollectionWallet}</span>
+        <button id="copyBtn" class="copy-btn" title="复制地址">📋</button>
+        <a href="https://bscscan.com/address/${config.bnbCollectionWallet}" target="_blank" class="explorer-link" title="BscScan">🔗</a>
+      </div>
     </div>
 
     <div class="steps">
@@ -103,26 +114,24 @@ export function renderRenewalPage(props: {
 
     <div class="note">💡 付款钱包必须与登记钱包一致才能自动续期。</div>
   </div>
-
-  <div class="card">
-    <h1>👛 登记钱包</h1>
-    <p class="subtitle">BNB 付款将从这个地址转出</p>
-
-    <form class="wallet-form" method="POST" action="/renew">
-      <input
-        type="text"
-        name="walletAddress"
-        placeholder="0x..."
-        value="${walletAddress || ""}"
-        required
-      />
-      <button type="submit" class="btn">保存钱包地址</button>
-    </form>
-    <p style="font-size:12px;color:#888;margin-top:8px;">当前登记：${walletAddress || "<span style='color:#e55100;'>未填写</span>"}</p>
-  </div>
 </div>
 
 <a href="/me" class="back">← 返回用户中心</a>
 </body>
+<script>
+document.getElementById('copyBtn')?.addEventListener('click', async () => {
+  const addr = document.getElementById('payAddr')?.textContent || '';
+  const btn = document.getElementById('copyBtn');
+  try {
+    await navigator.clipboard.writeText(addr);
+    btn.textContent = '✓';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 1500);
+  } catch {
+    btn.textContent = '✗';
+    setTimeout(() => { btn.textContent = '📋'; }, 1500);
+  }
+});
+</script>
 </html>`;
 }

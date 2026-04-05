@@ -16,8 +16,8 @@
 ## 服务器信息
 
 ```
-IP：139.224.105.241
-SSH Key：./ssh/139.224.105.241_20260404233402_id_rsa
+IP：regou.app
+SSH Key：./ssh/regou.app_20260404233402_id_rsa
 用户：root
 代码路径：/root/regou-app
 ```
@@ -69,18 +69,18 @@ tar czf /tmp/regouapp-deploy.tar.gz \
 **Step 2：上传**
 
 ```bash
-scp -i ./ssh/139.224.105.241_20260404233402_id_rsa \
+scp -i ./ssh/regou.app_20260404233402_id_rsa \
     -o StrictHostKeyChecking=no \
     /tmp/regouapp-deploy.tar.gz \
-    root@139.224.105.241:/root/regou-app.tar.gz
+    root@regou.app:/root/regou-app.tar.gz
 ```
 
 **Step 3：远程部署**
 
 ```bash
-ssh -i ./ssh/139.224.105.241_20260404233402_id_rsa \
+ssh -i ./ssh/regou.app_20260404233402_id_rsa \
     -o StrictHostKeyChecking=no \
-    root@139.224.105.241 bash << 'SCRIPT'
+    root@regou.app bash << 'SCRIPT'
 set -e
 
 # 备份
@@ -118,16 +118,16 @@ SCRIPT
 
 ```bash
 # 查看状态
-ssh -i ./ssh/... root@139.224.105.241 "pm2 list"
+ssh -i ./ssh/... root@regou.app "pm2 list"
 
 # 重启单个服务
-ssh -i ./ssh/... root@139.224.105.241 "pm2 restart regouapp-web"
+ssh -i ./ssh/... root@regou.app "pm2 restart regouapp-web"
 
 # 重启全部
-ssh -i ./ssh/... root@139.224.105.241 "pm2 restart all"
+ssh -i ./ssh/... root@regou.app "pm2 restart all"
 
 # 查看日志
-ssh -i ./ssh/... root@139.224.105.241 "pm2 logs regouapp-web --lines 50"
+ssh -i ./ssh/... root@regou.app "pm2 logs regouapp-web --lines 50"
 
 # 或用 ops 脚本
 bash scripts/ops/status.sh
@@ -141,20 +141,20 @@ bash scripts/ops/logs.sh
 curl -s -o /dev/null -w "%{http_code}" https://regou.app/
 
 # 检查端口监听
-ssh -i ./ssh/... root@139.224.105.241 "ss -tlnp | grep 30082"
+ssh -i ./ssh/... root@regou.app "ss -tlnp | grep 30082"
 
 # 检查 1Panel OpenResty
-ssh -i ./ssh/... root@139.224.105.241 "openresty -t"
+ssh -i ./ssh/... root@regou.app "openresty -t"
 ```
 
 ## 回滚
 
 ```bash
 # 找到备份
-ssh -i ./ssh/... root@139.224.105.241 "ls -t /root/ | grep regou-app_backup"
+ssh -i ./ssh/... root@regou.app "ls -t /root/ | grep regou-app_backup"
 
 # 恢复
-ssh -i ./ssh/... root@139.224.105.241 bash << 'SCRIPT'
+ssh -i ./ssh/... root@regou.app bash << 'SCRIPT'
 BACKUP=$(ls -t /root/ | grep 'regou-app_backup_' | head -1)
 if [ -n "$BACKUP" ]; then
     rm -rf /root/regou-app

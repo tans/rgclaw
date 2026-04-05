@@ -159,7 +159,7 @@ export async function hubCreateChannel(sessionCookie: string, botId: string): Pr
   return hubFetch<HubChannel>(`${HUB_BASE()}/api/bots/${botId}/channels`, {
     method: "POST",
     headers: { Cookie: `session=${sessionCookie}` },
-    body: JSON.stringify({ name: "rgclaw" }),
+    body: JSON.stringify({ name: "regou.app" }),
   });
 }
 
