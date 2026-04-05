@@ -1,19 +1,13 @@
 import { Hono } from "hono";
 import { openDb } from "../../db/sqlite";
 import { getActiveEntitlement } from "../../db/repositories/entitlements";
-import {
-  ensureDefaultSubscriptions,
-  listSubscriptions,
-  upsertWalletAddress,
-} from "../../db/repositories/subscriptions";
+import { ensureDefaultSubscriptions, listSubscriptions, upsertWalletAddress, } from "../../db/repositories/subscriptions";
 import { findActiveChannelBindingByUserId } from "../../db/repositories/channel-bindings";
+import { findActiveBindingByUserId as findDirectWechatBinding } from "../../db/repositories/wechat-bot-bindings";
 import type { AppEnv } from "../middleware/session";
 import { renderUserCenter } from "../views/user-center";
 
-type UserCenterUserRecord = {
-  email: string;
-  wallet_address: string | null;
-};
+type UserCenterUserRecord = { email: string; wallet_address: string | null; };
 
 export function userCenterRoutes() {
   const app = new Hono<AppEnv>();
@@ -25,18 +19,20 @@ export function userCenterRoutes() {
     }
 
     ensureDefaultSubscriptions(userId);
-
     const db = openDb();
-
     try {
       const user = db
         .query("select email, wallet_address from users where id = ?")
         .get(userId) as UserCenterUserRecord | null;
+
       const entitlement = getActiveEntitlement(userId);
       const subscriptions = listSubscriptions(userId);
 
-      // Check new Hub-based channel binding
+      // Check old Hub-based channel binding
       const hubBinding = findActiveChannelBindingByUserId(userId);
+      
+      // Check new direct WeChat Bot binding
+      const directBinding = findDirectWechatBinding(userId);
 
       // Detect ?bound=1 from successful WeChat bind redirect
       const justBound = c.req.query("bound") === "1";
@@ -47,6 +43,18 @@ export function userCenterRoutes() {
         const expiresAt = new Date(entitlement.expires_at).getTime();
         const now = Date.now();
         trialDaysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+      }
+
+      // Determine binding status text
+      let bindingStatusText: string;
+      const isBound = !!hubBinding || !!directBinding;
+      
+      if (directBinding) {
+        bindingStatusText = "已绑定（微信）";
+      } else if (hubBinding) {
+        bindingStatusText = "已绑定（Hub）";
+      } else {
+        bindingStatusText = "未绑定";
       }
 
       return c.html(
@@ -61,8 +69,8 @@ export function userCenterRoutes() {
                 : "试用已到期"
               : "付费"
             : "暂无",
-          bindingStatusText: hubBinding ? "已绑定（Hub）" : "未绑定",
-          bound: !!hubBinding,
+          bindingStatusText,
+          bound: isBound,
           justBound,
           trialDaysLeft,
         }),
@@ -77,16 +85,12 @@ export function userCenterRoutes() {
     if (!userId) {
       return c.text("unauthorized", 401);
     }
-
     const body = await c.req.parseBody();
     const walletAddress = body.walletAddress;
-
     if (typeof walletAddress !== "string") {
       return c.text("invalid wallet", 400);
     }
-
     upsertWalletAddress(userId, walletAddress.trim());
-
     return c.redirect("/me", 302);
   });
 

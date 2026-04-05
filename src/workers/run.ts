@@ -6,6 +6,7 @@ import {
   processLaunchPushes,
   processRenewalReminders,
 } from "./push-worker";
+import { scanRecentPaymentTransfers } from "./payment-scanner";
 
 const WORKER_POLL_DELAY_MS = 30_000;
 const KEEPALIVE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
@@ -16,6 +17,7 @@ type WorkerRunSummary = {
   keepalives: number;
   sentNotifications: number;
   sentSystemMessages: number;
+  paymentScans: number;
 };
 
 type RunWorkersOnceOptions = {
@@ -52,6 +54,7 @@ export async function runWorkersOnce({
   const keepalives = runKeepalives ? await enqueueKeepaliveReminders(now) : 0;
   const sentNotifications = await dispatchPendingNotificationMessages();
   const sentSystemMessages = await dispatchPendingSystemMessages();
+  const paymentScans = await scanRecentPaymentTransfers();
 
   return {
     notifications,
@@ -59,17 +62,23 @@ export async function runWorkersOnce({
     keepalives,
     sentNotifications,
     sentSystemMessages,
+    paymentScans,
   };
 }
 
-export function createScheduledWorkerRunOnce({
-  processLaunchPushes: runLaunchPushes = processLaunchPushes,
-  processRenewalReminders: runRenewalReminders = processRenewalReminders,
-  enqueueKeepaliveReminders: runKeepaliveReminders = enqueueKeepaliveReminders,
-  dispatchPendingNotificationMessages: runPendingNotificationMessages = dispatchPendingNotificationMessages,
-  dispatchPendingSystemMessages: runPendingSystemMessages = dispatchPendingSystemMessages,
-  now = () => new Date(),
-}: ScheduledWorkerDependencies) {
+export function createScheduledWorkerRunOnce(
+  deps: Partial<ScheduledWorkerDependencies> & { now?: () => Date } = {},
+) {
+  const {
+    processLaunchPushes: runLaunchPushes = processLaunchPushes,
+    processRenewalReminders: runRenewalReminders = processRenewalReminders,
+    enqueueKeepaliveReminders: runKeepaliveReminders = enqueueKeepaliveReminders,
+    dispatchPendingNotificationMessages: runPendingNotificationMessages = dispatchPendingNotificationMessages,
+    dispatchPendingSystemMessages: runPendingSystemMessages = dispatchPendingSystemMessages,
+  } = deps;
+
+  const now = deps.now ?? (() => new Date());
+
   let lastKeepaliveSweepAt: number | null = null;
 
   return async (): Promise<WorkerRunSummary> => {
@@ -83,6 +92,7 @@ export function createScheduledWorkerRunOnce({
     const keepalives = shouldRunKeepalives ? await runKeepaliveReminders(currentTime.toISOString()) : 0;
     const sentNotifications = await runPendingNotificationMessages();
     const sentSystemMessages = await runPendingSystemMessages();
+    const paymentScans = await scanRecentPaymentTransfers();
 
     if (shouldRunKeepalives) {
       lastKeepaliveSweepAt = currentTimeMs;
@@ -94,6 +104,7 @@ export function createScheduledWorkerRunOnce({
       keepalives,
       sentNotifications,
       sentSystemMessages,
+      paymentScans,
     };
   };
 }
@@ -122,7 +133,7 @@ export async function runWorkerLoop({
     onSuccess: () => {
       (logger ?? console).info("worker cycle complete");
     },
-    runOnce: scheduledRunOnce,
+    runOnce: scheduledRunOnce as () => Promise<void>,
     shouldContinue,
     sleep,
     startMessage: "worker boot",

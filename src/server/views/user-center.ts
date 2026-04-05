@@ -109,7 +109,7 @@ export function renderUserCenter(input: RenderUserCenterInput) {
       </div>
     </div>
     <br/>
-    <a href="/wechat/bind" class="btn">立即绑定微信 →</a>
+    <a href="/wechat/direct/bind" class="btn">立即绑定微信 →</a>
   </div>
   ` : input.trialDaysLeft !== undefined && input.trialDaysLeft >= 0 && input.trialDaysLeft <= 1 ? `
   <div class="banner warning">
@@ -134,7 +134,7 @@ export function renderUserCenter(input: RenderUserCenterInput) {
       <span class="info-value">
         ${input.bound
           ? `<span class="badge">✅ 已绑定</span>`
-          : `<span class="badge warn">⚠️ 未绑定</span> <a href="/wechat/bind">去绑定 →</a>`}
+          : `<span class="badge warn">⚠️ 未绑定</span> <a href="/wechat/direct/bind">去绑定 →</a>`}
       </span>
     </div>
     <div class="info-row">
@@ -151,7 +151,7 @@ export function renderUserCenter(input: RenderUserCenterInput) {
   <div class="card">
     <div class="section-title">快捷操作</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      <a href="/wechat/bind" class="btn">${input.bound ? "查看绑定" : "绑定微信"}</a>
+      <a href="/wechat/direct/bind" class="btn">${input.bound ? "查看绑定" : "绑定微信"}</a>
       <a href="/renew" class="btn" style="background:#f0f0f0;color:#333;">续费</a>
     </div>
   </div>
