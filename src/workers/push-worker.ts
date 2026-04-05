@@ -17,6 +17,10 @@ import {
 import {
   findActiveChannelBindingByUserId,
 } from "../db/repositories/channel-bindings";
+import {
+  findActiveBindingByUserId,
+} from "../db/repositories/wechat-bot-bindings";
+import { sendMessage as sendDirectWechatMessage } from "../services/wechatbot-service";
 import { markReminderSent } from "../db/repositories/entitlements";
 import { openDb } from "../db/sqlite";
 import { hubSendChannelMessage } from "../openilink/client";
@@ -50,9 +54,6 @@ export async function processLaunchPushes() {
           on user_source_subscriptions.source = launch_events.source
          and user_source_subscriptions.enabled = 1
         join users on users.id = user_source_subscriptions.user_id
-        join channel_bindings
-          on channel_bindings.user_id = users.id
-         and channel_bindings.status = 'active'
         join user_entitlements
           on user_entitlements.user_id = users.id
          and user_entitlements.status = 'active'
@@ -61,6 +62,18 @@ export async function processLaunchPushes() {
             select 1 from notification_jobs
             where notification_jobs.launch_event_id = launch_events.id
               and notification_jobs.user_id = users.id
+          )
+          and (
+            -- Hub channel binding (OAuth flow)
+            exists (
+              select 1 from channel_bindings cb
+              where cb.user_id = users.id and cb.status = 'active'
+            )
+            -- OR direct WeChat bot binding
+            or exists (
+              select 1 from wechat_bot_bindings wb
+              where wb.user_id = users.id and wb.status = 'active'
+            )
           )
       `)
       .all() as LaunchPushRow[];
@@ -254,38 +267,56 @@ export async function dispatchPendingNotificationMessages() {
   let sent = 0;
 
   for (const job of jobs) {
-    const binding = findActiveChannelBindingByUserId(job.user_id);
-
-    if (!binding || !binding.hub_api_key) {
-      markNotificationJobRetried(job.id, "binding missing", job.attempt_count + 1 >= 3);
-      continue;
-    }
-
     const launch = getLaunchContent(job.launch_event_id);
     if (!launch) {
       markNotificationJobRetried(job.id, "launch event missing", job.attempt_count + 1 >= 3);
       continue;
     }
 
-    try {
-      await sendViaHub(
-        {
-          hub_api_key: binding.hub_api_key,
-          hub_channel_id: binding.hub_channel_id,
-          bot_wechat_user_id: binding.bot_wechat_user_id ?? "",
-          last_context_token: binding.last_context_token,
-        },
-        buildLaunchMessage(launch.title, launch.token_address, launch.source),
-      );
-    } catch (error) {
-      markNotificationJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
-      continue;
+    const text = buildLaunchMessage(launch.title, launch.token_address, launch.source);
+
+    // Try Hub channel binding first (OAuth flow)
+    const hubBinding = findActiveChannelBindingByUserId(job.user_id);
+    if (hubBinding && hubBinding.hub_api_key) {
+      try {
+        await sendViaHub(
+          {
+            hub_api_key: hubBinding.hub_api_key,
+            hub_channel_id: hubBinding.hub_channel_id,
+            bot_wechat_user_id: hubBinding.bot_wechat_user_id ?? "",
+            last_context_token: hubBinding.last_context_token,
+          },
+          text,
+        );
+        const sentAt = new Date().toISOString();
+        markNotificationJobSent(job.id, sentAt);
+        await markOutboundSent(hubBinding.id, sentAt, false);
+        sent += 1;
+        continue;
+      } catch (error) {
+        markNotificationJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
+        continue;
+      }
     }
 
-    const sentAt = new Date().toISOString();
-    markNotificationJobSent(job.id, sentAt);
-    await markOutboundSent(binding.id, sentAt, false);
-    sent += 1;
+    // Fall back to direct WeChat bot binding
+    const wechatBinding = findActiveBindingByUserId(job.user_id);
+    if (wechatBinding) {
+      try {
+        await sendDirectWechatMessage(wechatBinding, wechatBinding.user_wx_id, text);
+        const sentAt = new Date().toISOString();
+        markNotificationJobSent(job.id, sentAt);
+        // Note: direct WeChat bindings don't track hub_outbound_at
+        sent += 1;
+        continue;
+      } catch (error) {
+        markNotificationJobRetried(job.id, getErrorMessage(error), job.attempt_count + 1 >= 3);
+        continue;
+      }
+    }
+
+    // No binding found
+    markNotificationJobRetried(job.id, "binding missing", job.attempt_count + 1 >= 3);
   }
 
   return sent;
