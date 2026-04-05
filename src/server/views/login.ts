@@ -41,7 +41,7 @@ export function renderLoginPage() {
       transition: all 0.2s;
     }
     .btn-wallet {
-      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      background: linear-gradient(135deg, rgb(7, 193, 96) 0%, rgb(52, 211, 153) 100%);
       color: #fff;
       margin-bottom: 12px;
     }

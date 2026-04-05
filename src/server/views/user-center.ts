@@ -51,7 +51,7 @@ export function renderUserCenter(input: RenderUserCenterInput) {
   a { color: #0070f0; text-decoration: none; }
 
   /* Onboarding banner */
-  .banner { background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; color: #fff; }
+  .banner { background: linear-gradient(135deg, rgb(7, 193, 96), rgb(52, 211, 153)); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; color: #fff; }
   .banner h2 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
   .banner p { font-size: 13px; opacity: 0.88; line-height: 1.55; margin-bottom: 14px; }
   .banner .btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(4px); padding: 10px 20px; font-size: 14px; }

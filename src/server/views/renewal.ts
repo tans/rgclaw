@@ -36,7 +36,7 @@ export function renderRenewalPage(props: {
   .btn-secondary { background: #f0f0f0; color: #333; margin-top: 8px; }
   .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
   .plan { border: 1px solid #eee; border-radius: 10px; padding: 16px; text-align: center; }
-  .plan.popular { border-color: #6366f1; background: rgba(99,102,241,0.04); }
+  .plan.popular { border-color: rgb(7, 193, 96); background: rgba(7, 193, 96, 0.04); }
   .plan-name { font-size: 12px; color: #888; margin-bottom: 6px; }
   .plan-price { font-size: 20px; font-weight: 700; }
   .plan-price span { font-size: 13px; font-weight: 400; color: #888; }

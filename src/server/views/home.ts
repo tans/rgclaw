@@ -38,16 +38,16 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
   .container { max-width: 720px; margin: 0 auto; padding: 0 20px; }
   nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; }
   .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
-  .logo span { color: #6366f1; }
+  .logo span { color: rgb(7, 193, 96); }
   .nav-links a { color: #888; text-decoration: none; font-size: 14px; margin-left: 24px; transition: color 0.2s; }
   .nav-links a:hover { color: #fff; }
   .hero { padding: 80px 0 60px; text-align: center; }
   .hero h1 { font-size: 40px; font-weight: 800; line-height: 1.15; margin-bottom: 16px; letter-spacing: -1px; }
-  .hero h1 em { font-style: normal; color: #6366f1; }
+  .hero h1 em { font-style: normal; color: rgb(7, 193, 96); }
   .hero p { font-size: 17px; color: #888; max-width: 480px; margin: 0 auto 32px; line-height: 1.6; }
   .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  .btn-primary { background: #6366f1; color: #fff; border: none; border-radius: 10px; padding: 14px 32px; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; transition: background 0.2s, transform 0.1s; }
-  .btn-primary:hover { background: #4f52d8; transform: translateY(-1px); }
+  .btn-primary { background: rgb(7, 193, 96); color: #fff; border: none; border-radius: 10px; padding: 14px 32px; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; transition: background 0.2s, transform 0.1s; }
+  .btn-primary:hover { background: rgb(6, 174, 86); transform: translateY(-1px); }
   .btn-secondary { background: rgba(255,255,255,0.06); color: #ccc; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px 32px; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; transition: background 0.2s; }
   .btn-secondary:hover { background: rgba(255,255,255,0.1); }
   .features { padding: 60px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
@@ -61,12 +61,12 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
   .event-item:hover { border-color: rgba(255,255,255,0.15); }
   .event-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .event-meta { display: flex; gap: 12px; font-size: 12px; color: #555; margin-bottom: 4px; }
-  .event-source { background: rgba(99,102,241,0.15); color: #818cf8; padding: 1px 6px; border-radius: 4px; }
+  .event-source { background: rgba(7, 193, 96, 0.15); color: rgb(7, 193, 96); padding: 1px 6px; border-radius: 4px; }
   .event-address { font-size: 11px; color: #444; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pricing { padding: 60px 0; border-top: 1px solid rgba(255,255,255,0.06); }
   .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
   .plan { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 24px; }
-  .plan.popular { border-color: #6366f1; background: rgba(99,102,241,0.08); }
+  .plan.popular { border-color: rgb(7, 193, 96); background: rgba(7, 193, 96, 0.08); }
   .plan-name { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #aaa; }
   .plan-price { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
   .plan-price span { font-size: 14px; font-weight: 400; color: #666; }

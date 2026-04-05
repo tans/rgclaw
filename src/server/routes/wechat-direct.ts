@@ -149,7 +149,7 @@ function renderBindPage() {
     .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
     .btn {
       display: inline-block;
-      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      background: linear-gradient(135deg, rgb(7, 193, 96) 0%, rgb(52, 211, 153) 100%);
       color: #fff;
       border: none;
       border-radius: 10px;
@@ -165,7 +165,7 @@ function renderBindPage() {
     .qr-wrap { margin: 24px 0; }
     .qr-wrap img { max-width: 200px; border-radius: 8px; }
     .status { padding: 16px; border-radius: 8px; font-size: 14px; margin: 16px 0; }
-    .status-waiting { background: rgba(99,102,241,0.1); color: #818cf8; }
+    .status-waiting { background: rgba(7, 193, 96, 0.1); color: rgb(7, 193, 96); }
     .status-success { background: rgba(34,197,94,0.1); color: #4ade80; }
     .status-error { background: rgba(239,68,68,0.1); color: #f87171; }
     .back-link { display: block; margin-top: 20px; color: #666; text-decoration: none; font-size: 14px; }
