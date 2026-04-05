@@ -3,7 +3,7 @@ import { getCookie } from "hono/cookie";
 import QRCode from "qrcode";
 import { findSession } from "../../db/repositories/sessions";
 import { findActiveBindingByUserId, createBinding, deactivateBinding } from "../../db/repositories/wechat-bot-bindings";
-import { startQRLogin, getQRStatus, clearQRStatus } from "../../services/wechatbot-service";
+import { startQRLogin, getQRStatus, clearQRStatus, startBotForBinding } from "../../services/wechatbot-service";
 import type { AppEnv } from "../middleware/session";
 
 export function wechatDirectRoutes() {
@@ -51,6 +51,10 @@ export function wechatDirectRoutes() {
           user_wx_id: status.credentials.userWxId,
           base_url: status.credentials.baseUrl,
         });
+        const newBinding = findActiveBindingByUserId(userId);
+        if (newBinding) {
+          startBotForBinding(newBinding);
+        }
         clearQRStatus(userId);
         return c.json({ status: "bound", redirect: "/wechat/direct/bind" });
       }

@@ -21,6 +21,8 @@ const qrStatusStore = new Map<string, QRCodeStatus>();
 
 const QR_GENERATION_TIMEOUT_MS = 25 * 1000;
 
+const AUTO_REPLY_MESSAGE = "发射事件监听已开启，更多功能开发中。";
+
 export function getQRCode(userId: string): { qrCodeUrl: string; qrToken: string } | null {
   const status = qrStatusStore.get(userId);
   if (status && status.status === "pending" && status.qrCodeUrl) {
@@ -63,7 +65,6 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
       return;
     }
 
-    // Start login - SDK returns credentials when confirmed
     (bot as any).login({
       callbacks: {
         onQrUrl: (qrUrl: string) => {
@@ -76,9 +77,6 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
           
           qrStatusStore.set(userId, { status: "pending", qrCodeUrl: qrUrl, qrToken });
           resolve({ qrCodeUrl: qrUrl, qrToken });
-          
-          // Continue polling for confirmation in background
-          pollForConfirmation(userId, bot!);
         },
         onScanned: () => {
           const current = qrStatusStore.get(userId);
@@ -94,7 +92,6 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
         },
       }
     }).then((creds: any) => {
-      // Login completed successfully
       const current = qrStatusStore.get(userId);
       if (current) {
         qrStatusStore.set(userId, {
@@ -121,12 +118,6 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
   });
 }
 
-// Background polling for confirmation (SDK handles this internally, but we track status)
-function pollForConfirmation(userId: string, bot: WeChatBot) {
-  // SDK handles the polling internally, we just need to check status
-  // This is a no-op since the .then() above handles completion
-}
-
 export function getQRStatus(userId: string): QRCodeStatus | undefined {
   return qrStatusStore.get(userId);
 }
@@ -137,12 +128,27 @@ export function clearQRStatus(userId: string): void {
 
 export function startBotForBinding(binding: WechatBotBinding): void {
   if (activeBots.has(binding.id)) return;
+  
   const bot = new WeChatBot({
     baseUrl: binding.base_url,
     token: binding.bot_token,
     botId: binding.bot_id,
   } as any);
+  
   activeBots.set(binding.id, bot);
+  
+  // Set up auto-reply for incoming messages
+  (bot as any).onMessage(async (msg: any) => {
+    try {
+      // Only reply to text messages and avoid replying to our own messages
+      if (msg.text && !msg.isFromSelf) {
+        await (bot as any).reply(msg, AUTO_REPLY_MESSAGE);
+      }
+    } catch (err) {
+      console.error("Auto-reply failed:", err);
+    }
+  });
+  
   (bot as any).start();
 }
 
