@@ -129,7 +129,12 @@ export function userCenterRoutes() {
       await sendMessage(binding, binding.user_wx_id, emoji);
       return c.json({ ok: true, emoji });
     } catch (err) {
-      console.error("send message failed:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("send message failed:", msg);
+      // Distinguish "bot inactive" (needs re-bind) from transient errors
+      if (msg.startsWith("WECHAT_BOT_INACTIVE:")) {
+        return c.json({ error: "微信机器人已离线，请重新绑定" }, 409);
+      }
       return c.json({ error: "发送失败" }, 500);
     }
   });

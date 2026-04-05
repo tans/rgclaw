@@ -333,10 +333,10 @@ export function startBotForBinding(binding: WechatBotBinding): Promise<void> {
   });
 
   // login() restores session from FileStorage (~/.wechatbot/) if credentials were
-  // previously saved during QR bind. Only add bot to activeBots AFTER start succeeds.
-  // Add bot to activeBots AFTER login succeeds (start() is WebSocket setup which may take time)
-  // so subsequent sendMessage calls don't fail with "no active bot".
-  return new Promise<void>((resolve) => {
+  // previously saved during QR bind. Only add bot to activeBots AFTER login succeeds.
+  // If login fails (timeout, expired creds, etc.) the stored creds are invalid —
+  // delete them so the user can re-bind via QR code without stale state interfering.
+  return new Promise<void>((resolve, reject) => {
     (bot as any).login()
       .then(() => {
         activeBots.set(binding.id, bot);
@@ -347,9 +347,18 @@ export function startBotForBinding(binding: WechatBotBinding): Promise<void> {
         });
         resolve();
       })
-      .catch((err: unknown) => {
-        console.warn(`[wechatbot] bot ${binding.id} login failed:`, err instanceof Error ? err.message : String(err));
-        resolve(); // still resolve so caller doesn't hang
+      .catch(async (err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.warn(`[wechatbot] bot ${binding.id} login failed (${errMsg}), clearing stale creds...`);
+        // Delete stale storage so re-bind works cleanly
+        try {
+          const { existsSync, rmSync } = require("fs");
+          if (existsSync(storageDir)) {
+            rmSync(storageDir, { recursive: true, force: true });
+          }
+        } catch {}
+        // Reject so bootstrap counts it as failed — caller should mark binding as needing re-bind
+        reject(new Error(`Bot login failed: ${errMsg}. Please re-bind your WeChat at regou.app`));
       });
   });
 }
@@ -391,7 +400,9 @@ export async function sendMessage(
 ): Promise<void> {
   const bot = activeBots.get(binding.id);
   if (!bot) {
-    throw new Error(`No active bot for binding ${binding.id}`);
+    // Bot not in activeBots — either still starting, login failed, or session expired.
+    // Throw a specific error so the caller can distinguish this from network errors.
+    throw new Error(`WECHAT_BOT_INACTIVE:Bot session inactive or expired for binding ${binding.id}. Please re-bind your WeChat at regou.app`);
   }
   // sendRaw sends via /ilink/bot/sendmessage without contextToken check.
   // msg shape: { from_user_id, to_user_id, client_id, message_type, message_state, item_list }
