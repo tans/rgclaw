@@ -5,7 +5,7 @@ import { ensureDefaultSubscriptions, listSubscriptions, upsertWalletAddress, tog
 import { findActiveChannelBindingByUserId } from "../../db/repositories/channel-bindings";
 import { findActiveBindingByUserId as findDirectWechatBinding } from "../../db/repositories/wechat-bot-bindings";
 import { listLatestLaunchEvents } from "../../db/repositories/launch-events";
-import { sendMessage } from "../../services/wechatbot-service";
+import { sendMessage, getActiveBot } from "../../services/wechatbot-service";
 import type { AppEnv } from "../middleware/session";
 import { renderUserCenter } from "../views/user-center";
 
@@ -137,6 +137,27 @@ export function userCenterRoutes() {
       }
       return c.json({ error: "发送失败" }, 500);
     }
+  });
+
+  // GET /me/bot-status — returns whether the user's WeChat bot is online
+  app.get("/me/bot-status", async (c) => {
+    const userId = c.get("sessionUserId");
+    if (!userId) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    const directBinding = findDirectWechatBinding(userId);
+    const hubBinding = findActiveChannelBindingByUserId(userId);
+    const binding = directBinding ?? hubBinding;
+    if (!binding) {
+      return c.json({ bound: false, online: false });
+    }
+    // For direct WeChat bindings, check activeBots Map
+    if (directBinding) {
+      const bot = getActiveBot(directBinding.id);
+      return c.json({ bound: true, online: !!bot, type: "wechat" });
+    }
+    // For Hub bindings, assume online (Hub manages the connection)
+    return c.json({ bound: true, online: true, type: "hub" });
   });
 
   return app;

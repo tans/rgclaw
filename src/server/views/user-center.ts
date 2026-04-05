@@ -301,6 +301,10 @@ export function renderUserCenter(input: RenderUserCenterInput) {
         <span class="info-label">微信</span>
         <span class="info-value">${input.bound ? "✅ 已绑定" : "⚠️ 未绑定"}</span>
       </div>
+      <div id="botStatusRow" class="info-row" style="display:none">
+        <span class="info-label">机器人</span>
+        <span id="botStatusValue" class="info-value">检查中...</span>
+      </div>
       <div class="info-row">
         <span class="info-label">订阅</span>
         <span class="info-value">${input.entitlementText}</span>
@@ -314,6 +318,30 @@ export function renderUserCenter(input: RenderUserCenterInput) {
 
     ${input.bound ? `
     <script>
+    // Poll bot status
+    (async function() {
+      const row = document.getElementById("botStatusRow");
+      const val = document.getElementById("botStatusValue");
+      if (!row || !val) return;
+      row.style.display = "flex";
+      try {
+        const res = await fetch("/me/bot-status");
+        if (!res.ok) { val.textContent = "⚠️ 检查失败"; val.style.color = "#e00"; return; }
+        const data = await res.json();
+        if (data.bound) {
+          if (data.online) {
+            val.textContent = "🟢 在线";
+            val.style.color = "rgb(7,193,96)";
+          } else {
+            val.textContent = "⚠️ 离线（请重新绑定）";
+            val.style.color = "#e07000";
+          }
+        } else {
+          row.style.display = "none";
+        }
+      } catch { val.textContent = "⚠️ 检查失败"; val.style.color = "#e00"; }
+    })();
+
     document.getElementById("sendMsgBtn")?.addEventListener("click", async () => {
       const btn = document.getElementById("sendMsgBtn");
       if (!btn) return;
