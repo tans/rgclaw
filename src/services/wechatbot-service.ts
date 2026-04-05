@@ -21,11 +21,8 @@ export type QRCodeStatus = {
 // 内存中存储临时 QR 绑定状态
 const qrStatusStore = new Map<string, QRCodeStatus>();
 
-// 存储正在进行的登录 Promise
-const loginPromises = new Map<string, Promise<void>>();
-
 const QR_EXPIRY_MS = 5 * 60 * 1000; // 5分钟过期
-const QR_GENERATION_TIMEOUT_MS = 30 * 1000; // 30秒生成超时
+const QR_GENERATION_TIMEOUT_MS = 25 * 1000; // 25秒生成超时（给前端留5秒buffer）
 
 // 获取二维码（不等待扫码完成）
 export function getQRCode(userId: string): { qrCodeUrl: string; qrToken: string } | null {
@@ -41,13 +38,6 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
   // 检查是否已有进行中的登录
   const existingStatus = qrStatusStore.get(userId);
   if (existingStatus && existingStatus.qrCodeUrl && existingStatus.status === "pending") {
-    // 重置过期时间
-    setTimeout(() => {
-      const current = qrStatusStore.get(userId);
-      if (current && current.status === "pending") {
-        qrStatusStore.set(userId, { ...current, status: "expired", error: "QR code expired" });
-      }
-    }, QR_EXPIRY_MS);
     return { qrCodeUrl: existingStatus.qrCodeUrl, qrToken: existingStatus.qrToken || "" };
   }
 
@@ -55,11 +45,11 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
   qrStatusStore.delete(userId);
 
   // 创建带超时的 QR 生成 Promise
-  const qrPromise = new Promise<{ qrCodeUrl: string; qrToken: string }>((resolve, reject) => {
+  return new Promise<{ qrCodeUrl: string; qrToken: string }>((resolve, reject) => {
     let resolved = false;
     let bot: WeChatBot | null = null;
 
-    // 设置生成超时（30秒）
+    // 设置生成超时（25秒）
     const generationTimeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
@@ -69,7 +59,7 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
         } catch {
           // ignore
         }
-        reject(new Error("QR code generation timeout after 30s"));
+        reject(new Error("QR code generation timeout"));
       }
     }, QR_GENERATION_TIMEOUT_MS);
 
@@ -121,16 +111,12 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
         clearTimeout(generationTimeout);
         if (resolved) return;
         resolved = true;
-        const current = qrStatusStore.get(userId);
-        if (current) {
-          qrStatusStore.set(userId, { ...current, status: "error", error: error.message });
-        }
+        qrStatusStore.set(userId, { status: "error", error: error.message });
         (bot as any)?.stop?.();
+        reject(error);
       },
     });
   });
-
-  return qrPromise;
 }
 
 export function getQRStatus(userId: string): QRCodeStatus | undefined {
