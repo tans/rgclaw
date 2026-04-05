@@ -5,6 +5,7 @@ import { runPollingLoop } from "../shared/polling-loop";
 import { createBscRpcClient } from "./rpc";
 import { collectFlapLaunchEvents } from "./flap";
 import { collectFourLaunchEvents } from "./four";
+import { runBackfillOnce, type BackfillOptions } from "./backfill";
 
 const COLLECTOR_POLL_DELAY_MS = 30_000;
 
@@ -18,6 +19,7 @@ type CollectorLoopOptions = {
   runOnce?: () => Promise<number>;
   shouldContinue?: () => boolean;
   sleep?: (delayMs: number) => Promise<void>;
+  backfillOptions?: BackfillOptions;
 };
 
 async function runCollectorBootPrep() {
@@ -37,16 +39,15 @@ async function runCollectorIteration() {
   ]);
 
   const events = [...fourEvents, ...flapEvents];
-
   for (const event of events) {
     insertLaunchEvent(event);
   }
-
   return events.length;
 }
 
 export async function runCollectorOnce() {
   await runCollectorBootPrep();
+  await runBackfillOnce({ logger: console });
   return runCollectorIteration();
 }
 
@@ -57,8 +58,17 @@ export async function runCollectorLoop({
   runOnce = runCollectorIteration,
   shouldContinue,
   sleep,
+  backfillOptions,
 }: CollectorLoopOptions = {}) {
   await bootPrep();
+  
+  // Run backfill before starting the polling loop
+  // In test mode or when explicitly skipped, backfill will be skipped
+  await runBackfillOnce({ 
+    logger: logger ?? console,
+    skipBackfill: backfillOptions?.skipBackfill,
+  });
+  
   await runPollingLoop({
     delayMs,
     logger,

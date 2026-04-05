@@ -96,3 +96,48 @@ export function upsertUserByHubUserId(hubUserId: string, email: string) {
     db.close();
   }
 }
+
+// 根据钱包地址查找用户
+export function findUserByWallet(walletAddress: string) {
+  const db = openDb(databasePath());
+  try {
+    const user = db
+      .query("select id, email, password_hash, hub_user_id, created_at, updated_at from users where wallet_address = ?")
+      .get(walletAddress.toLowerCase()) as UserRecord | null;
+    return user;
+  } finally {
+    db.close();
+  }
+}
+
+// 根据钱包地址创建或更新用户（upsert）
+export function upsertUserByWalletAddress(walletAddress: string): string | null {
+  const db = openDb(databasePath());
+  try {
+    const normalizedWallet = walletAddress.toLowerCase();
+    const existing = db
+      .query("select id from users where wallet_address = ?")
+      .get(normalizedWallet) as { id: string } | null;
+
+    if (existing) {
+      const now = new Date().toISOString();
+      db.query("update users set wallet_address_updated_at = ?, updated_at = ? where wallet_address = ?")
+        .run(now, now, normalizedWallet);
+      return existing.id;
+    }
+
+    // Create new user with wallet address
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    // Generate a placeholder email based on wallet address
+    const email = `${normalizedWallet.slice(2, 10)}@wallet.local`;
+    
+    db.query(
+      "insert into users (id, email, password_hash, wallet_address, wallet_address_updated_at, hub_user_id, created_at, updated_at) values (?, ?, '', ?, ?, null, ?, ?)",
+    ).run(id, email, normalizedWallet, now, now, now);
+    
+    return id;
+  } finally {
+    db.close();
+  }
+}

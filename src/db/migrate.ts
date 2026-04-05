@@ -20,6 +20,14 @@ const defaultMigrations: Migration[] = [
     id: "0002_channel_bindings",
     sql: readFileSync(new URL("./migrations/0002_channel_bindings.sql", import.meta.url), "utf8"),
   },
+  {
+    id: "0003_wechatbot_direct",
+    sql: readFileSync(new URL("./migrations/0003_wechatbot_direct.sql", import.meta.url), "utf8"),
+  },
+  {
+    id: "0004_backfill_progress",
+    sql: readFileSync(new URL("./migrations/0004_backfill_progress.sql", import.meta.url), "utf8"),
+  },
 ];
 
 export function runMigrations(path?: string, options: RunMigrationsOptions = {}) {
@@ -37,11 +45,9 @@ export function runMigrations(path?: string, options: RunMigrationsOptions = {})
     const existing = db.query("select id from _migrations where id = ?").get(migration.id) as
       | { id: string }
       | null;
-
     if (existing) {
       continue;
     }
-
     db.transaction((entry: Migration) => {
       db.exec(entry.sql);
       options.beforeRecordMigration?.(entry.id);

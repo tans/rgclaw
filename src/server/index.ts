@@ -10,6 +10,7 @@ const port = Number(process.env.PORT ?? 3000);
 const server = Bun.serve({
   port,
   fetch: app.fetch,
+  idleTimeout: 120, // 增加空闲超时到 120 秒，支持长时间 QR 登录
 });
 
 // Bootstrap Hub WS subscriptions for all active channel bindings
