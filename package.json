@@ -10,6 +10,7 @@
     "worker": "bun run src/workers/run.ts"
   },
   "dependencies": {
+    "@wechatbot/wechatbot": "^2.0.1",
     "hono": "^4.7.2"
   },
   "devDependencies": {
