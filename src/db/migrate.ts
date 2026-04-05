@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { openDb } from "./sqlite";
 
 type Migration = {
@@ -11,12 +12,18 @@ type RunMigrationsOptions = {
   beforeRecordMigration?: (migrationId: string) => void;
 };
 
-const defaultMigrations: Migration[] = [
-  {
-    id: "0001_initial",
-    sql: readFileSync(new URL("./migrations/0001_initial.sql", import.meta.url), "utf8"),
-  },
-];
+function loadSqlMigrations(): Migration[] {
+  const migrationsDir = new URL("./migrations", import.meta.url);
+  const files = readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+  return files.map((file) => ({
+    id: file.replace(".sql", ""),
+    sql: readFileSync(join(migrationsDir.pathname, file), "utf8"),
+  }));
+}
+
+const defaultMigrations: Migration[] = loadSqlMigrations();
 
 export function runMigrations(path?: string, options: RunMigrationsOptions = {}) {
   const db = openDb(path);

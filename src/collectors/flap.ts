@@ -33,7 +33,7 @@ export function normalizeFlapEvent(log: FlapLaunchLog) {
     eventTime: log.eventTime ?? new Date().toISOString(),
     chain: "bsc",
     rawPayload: JSON.stringify(log),
-    dedupeKey: `flap:${log.transactionHash}:${log.logIndex}`,
+    dedupeKey: `flap:${log.args.token}`,
   };
 }
 

@@ -35,7 +35,7 @@ export function normalizeFourEvent(log: FourLaunchLog) {
     eventTime: log.eventTime ?? new Date().toISOString(),
     chain: "bsc",
     rawPayload: JSON.stringify(log),
-    dedupeKey: `four:${log.transactionHash}:${log.logIndex}`,
+    dedupeKey: `four:${tokenAddress}`,
   };
 }
 
