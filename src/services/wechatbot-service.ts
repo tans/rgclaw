@@ -406,7 +406,14 @@ export async function sendMessage(
   }
   // sendRaw sends via /ilink/bot/sendmessage without contextToken check.
   // msg shape: { from_user_id, to_user_id, client_id, message_type, message_state, item_list }
-  await (bot as any).sendRaw({ to_user_id: toUserId, item_list: [{ type: "text", text: { text: content } }] });
+  // Wrap in a timeout so a dead WebSocket doesn't hang the dispatch loop forever.
+  const SEND_TIMEOUT_MS = 10_000;
+  await Promise.race([
+    (bot as any).sendRaw({ to_user_id: toUserId, item_list: [{ type: "text", text: { text: content } }] }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("WECHAT_BOT_INACTIVE:Message send timed out. Bot may be disconnected.")), SEND_TIMEOUT_MS)
+    ),
+  ]);
 }
 
 export function getActiveBot(bindingId: string): WeChatBot | undefined {
