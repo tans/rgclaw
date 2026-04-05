@@ -7,7 +7,9 @@ import { findActiveBindingByUserId as findDirectWechatBinding } from "../../db/r
 import type { AppEnv } from "../middleware/session";
 import { renderUserCenter } from "../views/user-center";
 
-type UserCenterUserRecord = { email: string; wallet_address: string | null; };
+type UserCenterUserRecord = {
+  wallet_address: string | null;
+};
 
 export function userCenterRoutes() {
   const app = new Hono<AppEnv>();
@@ -22,7 +24,7 @@ export function userCenterRoutes() {
     const db = openDb();
     try {
       const user = db
-        .query("select email, wallet_address from users where id = ?")
+        .query("select wallet_address from users where id = ?")
         .get(userId) as UserCenterUserRecord | null;
 
       const entitlement = getActiveEntitlement(userId);
@@ -59,7 +61,6 @@ export function userCenterRoutes() {
 
       return c.html(
         renderUserCenter({
-          email: user?.email ?? "",
           walletAddress: user?.wallet_address ?? "",
           subscriptions,
           entitlementText: entitlement

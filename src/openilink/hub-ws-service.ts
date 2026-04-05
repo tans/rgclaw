@@ -1,5 +1,5 @@
 /**
- * HubWSService — manages WebSocket connections to OpeniLink Hub Channel relay.
+ * HubWSService — manages WebSocket connections to clawbot Channel relay.
  *
  * Each active Hub channel binding gets its own WS subscription. When the Hub
  * Relay broadcasts inbound WeChat messages (user texts the Bot), this service

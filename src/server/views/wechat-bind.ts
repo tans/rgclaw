@@ -54,7 +54,7 @@ export function renderWechatBindPage(props: {
     <div class="step">
       <div class="step-num ${hubConnected ? "done" : "active"}">${hubConnected ? "✓" : "1"}</div>
       <div class="step-content">
-        <div class="step-title">连接 OpeniLink Hub</div>
+        <div class="step-title">连接 clawbot</div>
         ${hubConnected
           ? `<div class="step-desc">已连接</div>`
           : `<div class="step-desc">使用 GitHub 账号授权</div>`}

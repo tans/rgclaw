@@ -1,4 +1,4 @@
-// OpeniLink Hub API types
+// clawbot API types
 
 export type HubUser = {
   id: string;
