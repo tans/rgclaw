@@ -1,7 +1,6 @@
 import { WeChatBot } from "@wechatbot/wechatbot";
 import type { WechatBotBinding } from "../db/repositories/wechat-bot-bindings";
 
-// 存储活跃的 Bot 实例
 const activeBots = new Map<string, WeChatBot>();
 
 export type QRCodeStatus = {
@@ -18,13 +17,10 @@ export type QRCodeStatus = {
   error?: string;
 };
 
-// 内存中存储临时 QR 绑定状态
 const qrStatusStore = new Map<string, QRCodeStatus>();
 
-const QR_EXPIRY_MS = 5 * 60 * 1000; // 5分钟过期
-const QR_GENERATION_TIMEOUT_MS = 25 * 1000; // 25秒生成超时
+const QR_GENERATION_TIMEOUT_MS = 25 * 1000;
 
-// 获取二维码（不等待扫码完成）
 export function getQRCode(userId: string): { qrCodeUrl: string; qrToken: string } | null {
   const status = qrStatusStore.get(userId);
   if (status && status.status === "pending" && status.qrCodeUrl) {
@@ -33,50 +29,56 @@ export function getQRCode(userId: string): { qrCodeUrl: string; qrToken: string 
   return null;
 }
 
-// 启动 QR 登录流程（立即返回二维码）
 export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string; qrToken: string }> {
-  // 检查是否已有进行中的登录
   const existingStatus = qrStatusStore.get(userId);
   if (existingStatus && existingStatus.qrCodeUrl && existingStatus.status === "pending") {
     return { qrCodeUrl: existingStatus.qrCodeUrl, qrToken: existingStatus.qrToken || "" };
   }
 
-  // 清除之前的状态
   qrStatusStore.delete(userId);
 
-  const bot = new WeChatBot();
-
-  // SDK v2.0+ uses callbacks object in login options
   return new Promise<{ qrCodeUrl: string; qrToken: string }>((resolve, reject) => {
     let resolved = false;
+    let bot: WeChatBot | null = null;
 
-    // 设置生成超时（25秒）
     const generationTimeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
         qrStatusStore.set(userId, { status: "error", error: "QR code generation timeout" });
-        try {
-          (bot as any)?.stop?.();
-        } catch {}
+        try { (bot as any)?.stop?.(); } catch {}
         reject(new Error("QR code generation timeout"));
       }
     }, QR_GENERATION_TIMEOUT_MS);
 
-    // SDK v2.0+ API: callbacks are passed in options object
-    bot.login({
-      force: true, // Force new login even if credentials exist
+    try {
+      bot = new WeChatBot();
+    } catch (error) {
+      clearTimeout(generationTimeout);
+      if (!resolved) {
+        resolved = true;
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        qrStatusStore.set(userId, { status: "error", error: errorMsg });
+        reject(new Error(`Failed to initialize WeChatBot: ${errorMsg}`));
+      }
+      return;
+    }
+
+    // Start login - SDK returns credentials when confirmed
+    (bot as any).login({
       callbacks: {
         onQrUrl: (qrUrl: string) => {
           if (resolved) return;
           resolved = true;
           clearTimeout(generationTimeout);
           
-          // Extract token from URL if present
           const tokenMatch = qrUrl.match(/[?&]qrcode=([^&]+)/);
           const qrToken = tokenMatch ? tokenMatch[1] : "";
           
           qrStatusStore.set(userId, { status: "pending", qrCodeUrl: qrUrl, qrToken });
           resolve({ qrCodeUrl: qrUrl, qrToken });
+          
+          // Continue polling for confirmation in background
+          pollForConfirmation(userId, bot!);
         },
         onScanned: () => {
           const current = qrStatusStore.get(userId);
@@ -84,41 +86,45 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
             qrStatusStore.set(userId, { ...current, status: "scanned" });
           }
         },
-        onConfirmed: (creds: { token: string; botId: string; accountId: string; userId: string; baseUrl: string }) => {
-          const current = qrStatusStore.get(userId);
-          if (current) {
-            qrStatusStore.set(userId, {
-              ...current,
-              status: "confirmed",
-              credentials: {
-                botToken: creds.token,
-                botId: creds.botId,
-                accountId: creds.accountId,
-                userWxId: creds.userId,
-                baseUrl: creds.baseUrl,
-              },
-            });
-          }
-          try {
-            (bot as any)?.stop?.();
-          } catch {}
-        },
         onExpired: () => {
           const current = qrStatusStore.get(userId);
           if (current && !resolved) {
             qrStatusStore.set(userId, { ...current, status: "expired", error: "QR code expired" });
           }
         },
-      },
+      }
+    }).then((creds: any) => {
+      // Login completed successfully
+      const current = qrStatusStore.get(userId);
+      if (current) {
+        qrStatusStore.set(userId, {
+          ...current,
+          status: "confirmed",
+          credentials: {
+            botToken: creds.token,
+            botId: creds.accountId,
+            accountId: creds.accountId,
+            userWxId: creds.userId,
+            baseUrl: creds.baseUrl,
+          },
+        });
+      }
+      try { (bot as any)?.stop?.(); } catch {}
     }).catch((error: Error) => {
       clearTimeout(generationTimeout);
-      if (!resolved) {
-        resolved = true;
-        qrStatusStore.set(userId, { status: "error", error: error.message });
-        reject(error);
+      const current = qrStatusStore.get(userId);
+      if (current) {
+        qrStatusStore.set(userId, { ...current, status: "error", error: error.message });
       }
+      try { (bot as any)?.stop?.(); } catch {}
     });
   });
+}
+
+// Background polling for confirmation (SDK handles this internally, but we track status)
+function pollForConfirmation(userId: string, bot: WeChatBot) {
+  // SDK handles the polling internally, we just need to check status
+  // This is a no-op since the .then() above handles completion
 }
 
 export function getQRStatus(userId: string): QRCodeStatus | undefined {
@@ -130,9 +136,7 @@ export function clearQRStatus(userId: string): void {
 }
 
 export function startBotForBinding(binding: WechatBotBinding): void {
-  if (activeBots.has(binding.id)) {
-    return;
-  }
+  if (activeBots.has(binding.id)) return;
   const bot = new WeChatBot({
     baseUrl: binding.base_url,
     token: binding.bot_token,
