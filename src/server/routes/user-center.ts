@@ -4,6 +4,7 @@ import { getActiveEntitlement } from "../../db/repositories/entitlements";
 import { ensureDefaultSubscriptions, listSubscriptions, upsertWalletAddress, } from "../../db/repositories/subscriptions";
 import { findActiveChannelBindingByUserId } from "../../db/repositories/channel-bindings";
 import { findActiveBindingByUserId as findDirectWechatBinding } from "../../db/repositories/wechat-bot-bindings";
+import { listLatestLaunchEvents } from "../../db/repositories/launch-events";
 import type { AppEnv } from "../middleware/session";
 import { renderUserCenter } from "../views/user-center";
 
@@ -29,6 +30,7 @@ export function userCenterRoutes() {
 
       const entitlement = getActiveEntitlement(userId);
       const subscriptions = listSubscriptions(userId);
+      const recentEvents = listLatestLaunchEvents(10);
 
       // Check old Hub-based channel binding
       const hubBinding = findActiveChannelBindingByUserId(userId);
@@ -63,6 +65,7 @@ export function userCenterRoutes() {
         renderUserCenter({
           walletAddress: user?.wallet_address ?? "",
           subscriptions,
+          recentEvents,
           entitlementText: entitlement
             ? entitlement.plan_type === "trial"
               ? trialDaysLeft !== undefined && trialDaysLeft >= 0

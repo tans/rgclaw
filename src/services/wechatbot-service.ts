@@ -22,7 +22,7 @@ export type QRCodeStatus = {
 const qrStatusStore = new Map<string, QRCodeStatus>();
 
 const QR_EXPIRY_MS = 5 * 60 * 1000; // 5分钟过期
-const QR_GENERATION_TIMEOUT_MS = 25 * 1000; // 25秒生成超时（给前端留5秒buffer）
+const QR_GENERATION_TIMEOUT_MS = 25 * 1000; // 25秒生成超时
 
 // 获取二维码（不等待扫码完成）
 export function getQRCode(userId: string): { qrCodeUrl: string; qrToken: string } | null {
@@ -44,10 +44,11 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
   // 清除之前的状态
   qrStatusStore.delete(userId);
 
-  // 创建带超时的 QR 生成 Promise
+  const bot = new WeChatBot();
+
+  // SDK v2.0+ uses callbacks object in login options
   return new Promise<{ qrCodeUrl: string; qrToken: string }>((resolve, reject) => {
     let resolved = false;
-    let bot: WeChatBot | null = null;
 
     // 设置生成超时（25秒）
     const generationTimeout = setTimeout(() => {
@@ -56,65 +57,66 @@ export async function startQRLogin(userId: string): Promise<{ qrCodeUrl: string;
         qrStatusStore.set(userId, { status: "error", error: "QR code generation timeout" });
         try {
           (bot as any)?.stop?.();
-        } catch {
-          // ignore
-        }
+        } catch {}
         reject(new Error("QR code generation timeout"));
       }
     }, QR_GENERATION_TIMEOUT_MS);
 
-    try {
-      bot = new WeChatBot();
-    } catch (error) {
+    // SDK v2.0+ API: callbacks are passed in options object
+    bot.login({
+      force: true, // Force new login even if credentials exist
+      callbacks: {
+        onQrUrl: (qrUrl: string) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(generationTimeout);
+          
+          // Extract token from URL if present
+          const tokenMatch = qrUrl.match(/[?&]qrcode=([^&]+)/);
+          const qrToken = tokenMatch ? tokenMatch[1] : "";
+          
+          qrStatusStore.set(userId, { status: "pending", qrCodeUrl: qrUrl, qrToken });
+          resolve({ qrCodeUrl: qrUrl, qrToken });
+        },
+        onScanned: () => {
+          const current = qrStatusStore.get(userId);
+          if (current) {
+            qrStatusStore.set(userId, { ...current, status: "scanned" });
+          }
+        },
+        onConfirmed: (creds: { token: string; botId: string; accountId: string; userId: string; baseUrl: string }) => {
+          const current = qrStatusStore.get(userId);
+          if (current) {
+            qrStatusStore.set(userId, {
+              ...current,
+              status: "confirmed",
+              credentials: {
+                botToken: creds.token,
+                botId: creds.botId,
+                accountId: creds.accountId,
+                userWxId: creds.userId,
+                baseUrl: creds.baseUrl,
+              },
+            });
+          }
+          try {
+            (bot as any)?.stop?.();
+          } catch {}
+        },
+        onExpired: () => {
+          const current = qrStatusStore.get(userId);
+          if (current && !resolved) {
+            qrStatusStore.set(userId, { ...current, status: "expired", error: "QR code expired" });
+          }
+        },
+      },
+    }).catch((error: Error) => {
       clearTimeout(generationTimeout);
       if (!resolved) {
         resolved = true;
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        qrStatusStore.set(userId, { status: "error", error: errorMsg });
-        reject(new Error(`Failed to initialize WeChatBot: ${errorMsg}`));
-      }
-      return;
-    }
-
-    (bot as any).login({
-      onQRCode: (qrCodeUrl: string, qrToken: string) => {
-        if (resolved) return;
-        resolved = true;
-        clearTimeout(generationTimeout);
-        qrStatusStore.set(userId, { status: "pending", qrCodeUrl, qrToken });
-        resolve({ qrCodeUrl, qrToken });
-      },
-      onScanned: () => {
-        const current = qrStatusStore.get(userId);
-        if (current) {
-          qrStatusStore.set(userId, { ...current, status: "scanned" });
-        }
-      },
-      onConfirmed: (credentials: { token: string; botId: string; accountId: string; userId: string; baseUrl: string; }) => {
-        const current = qrStatusStore.get(userId);
-        if (current) {
-          qrStatusStore.set(userId, {
-            ...current,
-            status: "confirmed",
-            credentials: {
-              botToken: credentials.token,
-              botId: credentials.botId,
-              accountId: credentials.accountId,
-              userWxId: credentials.userId,
-              baseUrl: credentials.baseUrl,
-            },
-          });
-        }
-        (bot as any)?.stop?.();
-      },
-      onError: (error: Error) => {
-        clearTimeout(generationTimeout);
-        if (resolved) return;
-        resolved = true;
         qrStatusStore.set(userId, { status: "error", error: error.message });
-        (bot as any)?.stop?.();
         reject(error);
-      },
+      }
     });
   });
 }

@@ -1,8 +1,10 @@
 import type { SubscriptionRecord } from "../../db/repositories/subscriptions";
+import type { LaunchEventFeedItem } from "../../db/repositories/launch-events";
 
 type RenderUserCenterInput = {
   walletAddress: string;
   subscriptions: SubscriptionRecord[];
+  recentEvents: LaunchEventFeedItem[];
   entitlementText: string;
   bindingStatusText: string;
   bound: boolean;
@@ -19,6 +21,25 @@ export function renderUserCenter(input: RenderUserCenterInput) {
       </div>`,
     )
     .join("");
+
+  const recentEventsHtml = input.recentEvents.length === 0
+    ? `<p style="color:#888;text-align:center;padding:20px 0;">暂无发射事件</p>`
+    : input.recentEvents.slice(0, 5).map((event) => {
+        const time = new Date(event.event_time).toLocaleString("zh-CN", {
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        return `<div class="event-item">
+          <div class="event-title">${event.title}</div>
+          <div class="event-meta">
+            <span class="event-source">${event.source === "four" ? "Four" : event.source === "flap" ? "Flap" : event.source}</span>
+            <span class="event-time">${time}</span>
+          </div>
+          <div class="event-address">${event.token_address.slice(0, 8)}...${event.token_address.slice(-6)}</div>
+        </div>`;
+      }).join("");
 
   return `<!DOCTYPE html>
 <html lang="zh">
@@ -60,6 +81,16 @@ export function renderUserCenter(input: RenderUserCenterInput) {
     .check-icon { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; margin-top: 1px; }
     .check-icon.done { background: rgba(255,255,255,0.25); color: #fff; }
     .check-icon.pending { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.6); }
+    
+    /* Event styles */
+    .events { display: flex; flex-direction: column; gap: 8px; }
+    .event-item { background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 12px 14px; }
+    .event-item:hover { border-color: #ddd; }
+    .event-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .event-meta { display: flex; gap: 8px; font-size: 12px; color: #666; margin-bottom: 4px; }
+    .event-source { background: rgba(7, 193, 96, 0.1); color: rgb(7, 193, 96); padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+    .event-time { color: #999; }
+    .event-address { font-size: 11px; color: #999; font-family: monospace; }
   </style>
 </head>
 <body>
@@ -127,6 +158,13 @@ export function renderUserCenter(input: RenderUserCenterInput) {
       <div class="info-row">
         <span class="info-label">订阅状态</span>
         <span class="info-value">${input.entitlementText}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">最近发射事件</div>
+      <div class="events">
+        ${recentEventsHtml}
       </div>
     </div>
 
