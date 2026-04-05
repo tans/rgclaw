@@ -1,3 +1,6 @@
+-- 完整的初始数据库结构
+-- 支持钱包登录，email 可选
+
 create table if not exists users (
   id text primary key,
   email text,
@@ -156,12 +159,8 @@ create table if not exists wechat_bot_bindings (
   updated_at text not null
 );
 
-create unique index if not exists idx_wechat_bot_active_user 
-  on wechat_bot_bindings (user_id) 
-  where status = 'active';
-
-create index if not exists idx_wechat_bot_status 
-  on wechat_bot_bindings (status);
+create unique index if not exists idx_wechat_bot_active_user on wechat_bot_bindings (user_id) where status = 'active';
+create index if not exists idx_wechat_bot_status on wechat_bot_bindings (status);
 
 create table if not exists wechat_inbound_queue (
   id text primary key,
@@ -177,9 +176,9 @@ create table if not exists wechat_inbound_queue (
   created_at text not null
 );
 
-create index if not exists idx_wechat_queue_binding 
-  on wechat_inbound_queue (binding_id, processed);
+create index if not exists idx_wechat_queue_binding on wechat_inbound_queue (binding_id, processed);
+create index if not exists idx_wechat_queue_pending on wechat_inbound_queue (processed, received_at) where processed = 0;
 
-create index if not exists idx_wechat_queue_pending 
-  on wechat_inbound_queue (processed, received_at) 
-  where processed = 0;
+-- 索引
+create index if not exists idx_users_wallet on users(wallet_address) where wallet_address is not null;
+create index if not exists idx_users_email on users(email) where email is not null;
