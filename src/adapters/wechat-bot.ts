@@ -52,12 +52,13 @@ export async function sendWechatMessage(input: SendWechatMessageInput) {
   return { ok: true };
 }
 
-export function buildLaunchMessage(tokenAddress: string, source: string, symbol?: string | null) {
+export function buildLaunchMessage(tokenAddress: string, source: string, symbol?: string | null, title?: string | null) {
   const sourceLabel = source === "four" ? "Four" : source === "flap" ? "Flap" : source;
   const shortAddr = `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`;
   const displayName = symbol || shortAddr;
+  const headline = title ? `🔥 ${sourceLabel} 发射：${title}` : `🔥 ${sourceLabel} 发射！`;
   return [
-    `🔥 ${sourceLabel} 发射！`,
+    headline,
     ``,
     `代币: ${displayName}`,
     `合约: ${shortAddr}`,

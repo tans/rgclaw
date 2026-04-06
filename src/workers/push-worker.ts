@@ -223,7 +223,7 @@ export async function dispatchPendingNotificationMessages() {
       continue;
     }
 
-    const text = buildLaunchMessage(launch.token_address, launch.source, launch.symbol);
+    const text = buildLaunchMessage(launch.token_address, launch.source, launch.symbol, launch.title);
 
     const wechatBinding = findActiveBindingByUserId(job.user_id);
     if (!wechatBinding) {
