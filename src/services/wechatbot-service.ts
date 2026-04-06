@@ -427,16 +427,28 @@ export async function sendMessage(
 ): Promise<void> {
   const bot = activeBots.get(binding.id);
   if (!bot) {
-    // Bot not in activeBots — either still starting, login failed, or session expired.
-    // Throw a specific error so the caller can distinguish this from network errors.
     throw new Error(`WECHAT_BOT_INACTIVE:Bot session inactive or expired for binding ${binding.id}. Please re-bind your WeChat at regou.app`);
   }
-  // sendRaw sends via /ilink/bot/sendmessage without contextToken check.
-  // msg shape: { from_user_id, to_user_id, client_id, message_type, message_state, item_list }
-  // Wrap in a timeout so a dead WebSocket doesn't hang the dispatch loop forever.
+
+  // Load context_token for the bot's own userId from the shared context store.
+  // Per-binding storage has no context_tokens.json, so we load from the shared dir.
+  const SHARED_CONTEXT_PATH = "/root/.wechatbot/context_tokens.json";
+  let contextToken: string | undefined;
+  try {
+    const { readFileSync } = require("fs");
+    const tokens = JSON.parse(readFileSync(SHARED_CONTEXT_PATH, "utf-8")) as Record<string, string>;
+    // The context token is stored under the bot's own userId
+    contextToken = tokens[binding.user_wx_id];
+  } catch {}
+
+  if (!contextToken) {
+    throw new Error(`WECHAT_BOT_INACTIVE:No context token found. Please send a message to the bot first, then try again.`);
+  }
+
+  // Use bot.send() which includes context_token in the payload.
   const SEND_TIMEOUT_MS = 10_000;
   await Promise.race([
-    (bot as any).sendRaw({ to_user_id: toUserId, item_list: [{ type: "text", text: { text: content } }] }),
+    (bot as any).send(toUserId, content),
     new Promise((_, reject) =>
       setTimeout(() => reject(new Error("WECHAT_BOT_INACTIVE:Message send timed out. Bot may be disconnected.")), SEND_TIMEOUT_MS)
     ),
