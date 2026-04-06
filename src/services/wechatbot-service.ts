@@ -26,6 +26,18 @@ const QR_GENERATION_TIMEOUT_MS = 60 * 1000;
 
 const AUTO_REPLY_MESSAGE = "发射事件监听已开启，更多功能开发中。";
 
+async function fetchBnbPrice(): Promise<string> {
+  try {
+    const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT");
+    if (!res.ok) throw new Error("binance api error");
+    const data = (await res.json()) as { price: string };
+    const price = Number(data.price).toFixed(2);
+    return `$${price} USDT`;
+  } catch {
+    return "暂时无法获取";
+  }
+};
+
 // ─── Command reply builders ────────────────────────────────────────────────
 
 function buildHelpText(): string {
@@ -37,6 +49,7 @@ function buildHelpText(): string {
 /unsub four — 关闭 Four 推送
 /unsub flap — 关闭 Flap 推送
 /history — 查看最近发射记录
+/bnb — 查询 BNB 当前价格
 /help — 显示此帮助`;
 }
 
@@ -139,6 +152,13 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
         case "历史":
           await bot.reply(msg, buildHistoryText(binding.user_id));
           return;
+
+        case "bnb":
+        case "bnb价格": {
+          const price = await fetchBnbPrice();
+          await bot.reply(msg, `🪙 BNB 当前价格\n\n${price}\n\n数据来源: Binance`);
+          return;
+        }
 
         default:
           await bot.reply(msg, buildUnknownCommand(cmd));

@@ -52,11 +52,19 @@ export async function sendWechatMessage(input: SendWechatMessageInput) {
   return { ok: true };
 }
 
-export function buildLaunchMessage(title: string, tokenAddress: string, source: string, symbol?: string | null) {
+export function buildLaunchMessage(tokenAddress: string, source: string, symbol?: string | null) {
   const sourceLabel = source === "four" ? "Four" : source === "flap" ? "Flap" : source;
-  const shortAddr = tokenAddress.slice(0, 8) + "..." + tokenAddress.slice(-6);
+  const shortAddr = `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`;
   const displayName = symbol || shortAddr;
-  return `🔥 ${sourceLabel} 发射\n\n${displayName}\n合约: ${tokenAddress}\nDexScreener: https://dexscreener.com/bsc/${tokenAddress}`;
+  return [
+    `🔥 ${sourceLabel} 发射！`,
+    ``,
+    `代币: ${displayName}`,
+    `合约: ${shortAddr}`,
+    `DexScreener: https://dexscreener.com/bsc/${tokenAddress}`,
+    ``,
+    `第一时间掌握发射机会 👆`,
+  ].join("\n");
 }
 
 export function buildRenewalReminder(expiresAt: string) {
