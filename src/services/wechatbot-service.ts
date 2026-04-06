@@ -85,7 +85,14 @@ function buildStatusText(entitlement: { plan_type: string; expires_at: string },
   const subs = listSubscriptions(userId);
   const fourOn = subs.find(s => s.source === "four")?.enabled === 1;
   const flapOn = subs.find(s => s.source === "flap")?.enabled === 1;
-  return `📋 订阅状态\n\n套餐: ${plan}\n到期: ${expires}\n\nFour 推送: ${fourOn ? "✅ 开启" : "❌ 关闭"}\nFlap 推送: ${flapOn ? "✅ 开启" : "❌ 关闭"}\n\n输入 /plans 查看套餐，输入 /upgrade 立即续费。`;
+  const isTrial = entitlement.plan_type === "trial";
+  let expiryLine = `到期: ${expires}`;
+  if (isTrial) {
+    const remainingMs = new Date(entitlement.expires_at).getTime() - Date.now();
+    const remainingDays = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
+    expiryLine += `（剩余 ${remainingDays} 天）`;
+  }
+  return `📋 订阅状态\n\n套餐: ${plan}\n${expiryLine}\n\nFour 推送: ${fourOn ? "✅ 开启" : "❌ 关闭"}\nFlap 推送: ${flapOn ? "✅ 开启" : "❌ 关闭"}\n\n${isTrial ? "⚡ 试用即将到期？续费后推送不中断！\n" : ""}输入 /plans 查看套餐，输入 /upgrade 立即续费。`;
 }
 
 function buildToggleResult(source: string, newState: boolean): string {
