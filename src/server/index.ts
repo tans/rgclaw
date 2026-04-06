@@ -45,7 +45,7 @@ setInterval(() => {
       "../db/repositories/wechat-bot-bindings.js"
     );
 
-    const pending = claimPendingWechatSends(20);
+    const pending = claimPendingWechatSends(200);
     for (const send of pending) {
       const binding = findActiveBindingByWxId(send.user_wx_id);
       if (!binding) {
@@ -67,6 +67,20 @@ setInterval(() => {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.startsWith("WECHAT_BOT_INACTIVE")) {
+          // Bot inactive — reset to pending for next poll cycle to retry
+          const rdb = openDb();
+          rdb.query(
+            "update pending_wechat_sends set status = 'pending' where id = ?",
+          ).run(send.id);
+          rdb.close();
+          console.log(
+            `[sendq] BOT_INACTIVE send=${send.id} binding=${binding.id}, will retry`,
+          );
+        } else if (msg.includes("ret=-2") || msg.includes("API error ret=")) {
+          // External bot API permanently unavailable — do not retry
+          markWechatSendFailed(send.id, msg);
+          console.log(`[sendq] BOT_API_PERMANENT send=${send.id} ret=-2, giving up`);
+        } else {
           // Bot inactive — reset to pending for next poll cycle to retry
           const rdb = openDb();
           rdb.query(
