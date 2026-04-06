@@ -1,4 +1,5 @@
 import { runMigrations } from "../db/migrate";
+import { openDb } from "../db/sqlite";
 import { createApp } from "./app";
 import { bootstrapDirectWeChatBots, sendMessage } from "../services/wechatbot-service";
 
@@ -66,12 +67,12 @@ setInterval(() => {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.startsWith("WECHAT_BOT_INACTIVE")) {
-          // Bot not active in this process either — leave as pending for next cycle
-          // (mark as failed so it can be reclaimed)
-          const {
-            claimPendingWechatSends: _reclaim,
-          } = await import("../db/repositories/notification-jobs.js");
-          markWechatSendFailed(send.id, msg);
+          // Bot inactive — reset to pending for next poll cycle to retry
+          const rdb = openDb();
+          rdb.query(
+            "update pending_wechat_sends set status = 'pending' where id = ?",
+          ).run(send.id);
+          rdb.close();
           console.log(
             `[sendq] BOT_INACTIVE send=${send.id} binding=${binding.id}, will retry`,
           );
