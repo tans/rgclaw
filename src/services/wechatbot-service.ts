@@ -109,11 +109,12 @@ async function buildPlansText(): Promise<string> {
   const yearlyUsd = bnbPrice != "暂时无法获取" ? `（约 $${(Number(bnbPrice.replace("$","").replace(" USDT","")) * 0.045).toFixed(2)}）` : "";
   return `💳 Regou 套餐
 
-月付：0.005 BNB${monthlyUsd}（30 天）
-年付：0.045 BNB${yearlyUsd}（365 天，省 25%）
+⭐ 年付 0.045 BNB${yearlyUsd}（365 天，省 25%）— 推荐
+月付 0.005 BNB${monthlyUsd}（30 天）
 
-付款后自动上链检测并续期。
-前往 regou.app/renew 完成续费。`;
+✅ 付款后自动上链检测并续期，不中断推送
+
+👉 regou.app/renew`;
 }
 
 function buildUpgradeText(): string {
