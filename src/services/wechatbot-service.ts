@@ -133,7 +133,8 @@ function buildHistoryText(userId: string): string {
   const lines = events.map(ev => {
     const label = ev.source === "four" ? "Four" : ev.source === "flap" ? "Flap" : ev.source;
     const time = new Date(ev.event_time).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-    return `🔥 ${label} — ${ev.title}\n合约: ${ev.token_address}\n${time}`;
+    const shortAddr = `${ev.token_address.slice(0, 6)}...${ev.token_address.slice(-4)}`;
+    return `🔥 ${label} — ${ev.title}\n代币: ${ev.symbol || shortAddr}\n合约: ${shortAddr}\nDexScreener: https://dexscreener.com/bsc/${ev.token_address}\n${time}`;
   });
   return `📜 最近发射记录\n\n${lines.join("\n\n")}`;
 }
