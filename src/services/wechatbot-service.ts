@@ -52,6 +52,7 @@ function buildHelpText(): string {
 /history — 查看最近发射记录
 /bnb — 查询 BNB 当前价格
 /ping — 机器人在线检测
+/test — 发送测试消息
 /plans — 查看套餐与价格
 /upgrade · /renew — 立即前往续费页
 /help — 显示此帮助`;
@@ -190,6 +191,19 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
         case "状态":
           await bot.reply(msg, buildStatusText(entitlement, binding.user_id));
           return;
+
+        case "test":
+        case "测试": {
+          // 发送测试消息验证 bot 是否正常工作
+          await bot.reply(msg, `📤 测试消息
+
+机器人状态: ✅ 在线
+绑定账号: ${binding.user_id.slice(0, 8)}...
+推送服务: 正常
+
+如果收到此消息，说明推送通道正常。`);
+          return;
+        }
 
         case "sub":
         case "订阅": {
