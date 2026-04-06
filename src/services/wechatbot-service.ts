@@ -52,7 +52,7 @@ function buildHelpText(): string {
 /history — 查看最近发射记录
 /bnb — 查询 BNB 当前价格
 /plans — 查看套餐与价格
-/upgrade — 立即前往续费页
+/upgrade · /renew — 立即前往续费页
 /help — 显示此帮助`;
 }
 
@@ -231,6 +231,7 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
           return;
 
         case "upgrade":
+        case "renew":
         case "续费":
           await bot.reply(msg, buildUpgradeText());
           return;

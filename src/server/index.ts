@@ -81,18 +81,13 @@ setInterval(() => {
           markWechatSendFailed(send.id, msg);
           console.log(`[sendq] BOT_API_PERMANENT send=${send.id} ret=-2, giving up`);
         } else {
-          // Bot inactive — reset to pending for next poll cycle to retry
+          // Generic error — reset to pending for retry
           const rdb = openDb();
           rdb.query(
             "update pending_wechat_sends set status = 'pending' where id = ?",
           ).run(send.id);
           rdb.close();
-          console.log(
-            `[sendq] BOT_INACTIVE send=${send.id} binding=${binding.id}, will retry`,
-          );
-        } else {
-          markWechatSendFailed(send.id, msg);
-          console.log(`[sendq] FAIL send=${send.id} error=${msg}`);
+          console.log(`[sendq] FAIL send=${send.id} error=${msg}, will retry`);
         }
       }
     }
