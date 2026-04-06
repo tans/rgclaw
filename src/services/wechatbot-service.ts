@@ -53,6 +53,7 @@ function buildHelpText(): string {
 /bnb — 查询 BNB 当前价格
 /ping — 机器人在线检测
 /test — 发送测试消息
+/trial — 查看试用到期时间
 /plans — 查看套餐与价格
 /upgrade · /renew — 立即前往续费页
 /help — 显示此帮助`;
@@ -202,6 +203,32 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
 推送服务: 正常
 
 如果收到此消息，说明推送通道正常。`);
+          return;
+        }
+
+        case "trial":
+        case "试用": {
+          // 显示试用到期倒计时，催促升级
+          if (!entitlement) {
+            await bot.reply(msg, `你还没有订阅体验。
+
+立即开始试用：
+👉 regou.app`);
+            return;
+          }
+          const expiresAt = new Date(entitlement.expires_at);
+          const remainingMs = expiresAt.getTime() - Date.now();
+          const remainingDays = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
+          const remainingHours = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60)));
+          let countdown = remainingDays > 0 ? `${remainingDays} 天` : remainingHours > 0 ? `${remainingHours} 小时` : "即将到期";
+          await bot.reply(msg, `⏰ ${entitlement.plan_type === "trial" ? "试用" : "订阅"}剩余时间：${countdown}
+
+${entitlement.plan_type === "trial" ? "试用到期后推送将中断，新的发射事件不再推送。
+
+立即升级，不中断推送体验：" : "你的订阅状态："}
+👉 regou.app/renew
+
+套餐：月付 0.005 BNB，年付 0.045 BNB（省 25%）`);
           return;
         }
 
