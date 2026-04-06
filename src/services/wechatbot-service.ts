@@ -100,11 +100,14 @@ function buildToggleResult(source: string, newState: boolean): string {
   return `${label} 推送已${newState ? "开启" : "关闭"} ✅`;
 }
 
-function buildPlansText(): string {
+async function buildPlansText(): Promise<string> {
+  const bnbPrice = await fetchBnbPrice();
+  const monthlyUsd = bnbPrice != "暂时无法获取" ? `（约 $${(Number(bnbPrice.replace("$","").replace(" USDT","")) * 0.005).toFixed(2)}）` : "";
+  const yearlyUsd = bnbPrice != "暂时无法获取" ? `（约 $${(Number(bnbPrice.replace("$","").replace(" USDT","")) * 0.045).toFixed(2)}）` : "";
   return `💳 Regou 套餐
 
-月付：0.005 BNB（30 天）
-年付：0.045 BNB（365 天，省 25%）
+月付：0.005 BNB${monthlyUsd}（30 天）
+年付：0.045 BNB${yearlyUsd}（365 天，省 25%）
 
 付款后自动上链检测并续期。
 前往 regou.app/renew 完成续费。`;
@@ -224,7 +227,7 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
 
         case "plans":
         case "套餐":
-          await bot.reply(msg, buildPlansText());
+          await bot.reply(msg, await buildPlansText());
           return;
 
         case "upgrade":
