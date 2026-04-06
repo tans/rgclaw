@@ -1,338 +1,399 @@
 # Regou.app — Meme Token 发射通知服务
 
-**微信推送 · BSC 链上事件 · 付费订阅**
-
-> 监控 pump.fun、4-byte、GMGN 的 Token 上线事件，事件发生后第一时间通过微信推送订阅用户，支持免费试用与付费专业版。
+> 监控 BSC 链上 pump.fun / 4-byte / GMGN 的 Token 上线事件，事件发生后第一时间通过微信推送给订阅用户。免费试用 3 天，专业版月付/年付解锁全量通知。
 
 ---
 
 ## 目录
 
 - [系统架构](#系统架构)
-- [目录结构](#目录结构)
+- [项目结构](#项目结构)
 - [核心模块](#核心模块)
-- [数据库表](#数据库表)
-- [机器人指令](#机器人指令)
+- [数据库](#数据库)
+- [微信机器人指令](#微信机器人指令)
 - [订阅与计费](#订阅与计费)
-- [部署指南](#部署指南)
+- [监控与告警](#监控与告警)
+- [部署](#部署)
 - [环境变量](#环境变量)
 - [开发调试](#开发调试)
+- [常见问题](#常见问题)
 
 ---
 
 ## 系统架构
 
 ```
- BSC 链上事件 (pump.fun / 4-byte / GMGN)
-          │
-          ▼
-  ┌─────────────────────────┐
-  │  regouapp-collector     │  ← 每分钟轮询 BSC RPC，抓取 NewToken 事件
-  │  src/collectors/run.ts  │    结果写入 launch_events 表
-  └────────┬────────────────┘
-           │ notification_jobs (pending)
-           ▼
-  ┌─────────────────────────┐
-  │  regouapp-worker        │  ← 每 10s 轮询 pending 任务，找用户、找微信绑定、
-  │  src/workers/run.ts     │    发推送消息
-  └────────┬────────────────┘
-           │ pending_wechat_sends
-           ▼
-  ┌─────────────────────────┐
-  │  regouapp-web           │  ← Web 服务器 (Hono, port 30082)
-  │  src/server/index.ts   │    · HTTP API (事件/订阅/续费)
-           │                · WeChat 回调 (webhook)
-           │                · 微信消息派发 (queue poller, 每 10s)
-           └────────────────┘
+ BSC 链 (pump.fun · 4-byte · GMGN)
+        │
+        ▼
+┌──────────────────────────────┐
+│  regouapp-collector (PM2)    │  每分钟轮询 BSC RPC
+│  src/collectors/run.ts       │  抓取 TokenCreated 事件
+└────────────┬─────────────────┘
+             │ launch_events
+             ▼
+┌──────────────────────────────┐
+│  regouapp-worker (PM2)       │  每 10s 轮询 pending jobs
+│  src/workers/run.ts          │  创建 notification_jobs
+└────────────┬─────────────────┘
+             │ notification_jobs (pending/queued)
+             ▼
+┌──────────────────────────────┐
+│  regouapp-web (PM2)          │  Web 服务器
+│  src/server/index.ts        │  · HTTP API (事件/订阅/续费/微信回调)
+             │                · Queue Poller 每 10s 发微信
+             └────────────────┘
                           │
                           ▼
-                    微信用户 ←── /start /sub /status 等指令
-
-  ┌─────────────────────────┐
-  │  push-monitor (cron)    │  ← 每 10 分钟触发一次，写入健康记录 & 告警
-  │  scripts/push-monitor.sh│
-  └─────────────────────────┘
+                   微信用户 ←── /start /sub four /plans 等
 ```
-
-### 服务进程 (PM2)
-
-| 进程名 | 入口文件 | 职责 |
-|--------|---------|------|
-| `regouapp-web` | `src/server/index.ts` | HTTP 服务器、WeChat 回调、消息派发轮询 |
-| `regouapp-collector` | `src/collectors/run.ts` | 区块链事件采集 |
-| `regouapp-worker` | `src/workers/run.ts` | 推送任务、续费提醒、保活提醒、支付扫描 |
-| `push-monitor` | `scripts/push-monitor.sh` (cron) | 推送覆盖率 + 链上采集健康检查 |
 
 ---
 
-## 目录结构
+## 项目结构
 
 ```
-src/
-├── adapters/
-│   └── wechat-bot.ts          # WeChat Bot HTTP API 适配器
-├── collectors/
-│   ├── client.ts               # HTTP collector 客户端 (GMGN 等)
-│   ├── flap.ts                 # Flap/Portal 合约事件采集
-│   ├── four.ts                 # 4-byte 合约事件采集
-│   ├── rpc.ts                 # BSC JSON-RPC 封装
-│   └── run.ts                 # Collector 主循环
-├── db/
-│   ├── sqlite.ts              # SQLite 连接 (bun:sqlite, WAL)
-│   ├── migrate.ts             # 迁移执行器
-│   ├── schema.sql            # 建表语句
-│   ├── migrations/           # SQL 迁移文件
-│   │   ├── 0001_initial.sql
-│   │   ├── 0002_fix_duplicate_subscriptions.sql
-│   │   ├── 0003_dedupe_launch_events.sql
-│   │   ├── 0004_pending_wechat_sends.sql
-│   │   └── 0005_push_monitor.sql
-│   └── repositories/        # 数据访问层
-│       ├── entitlements.ts
-│       ├── launch-events.ts
-│       ├── notification-jobs.ts
-│       ├── payment-records.ts
-│       ├── push-monitor.ts   # 推送健康记录读写
-│       ├── subscriptions.ts
-│       ├── users.ts
-│       ├── wechat-bindings.ts
-│       └── wechat-inbound-events.ts
-├── server/
-│   ├── index.ts              # HTTP 入口 (PM2 启动文件)
-│   ├── app.ts               # Hono 应用工厂
-│   ├── middleware/
-│   │   └── session.ts       # 会话中间件
-│   ├── routes/
-│   │   ├── auth.ts          # 登录
-│   │   ├── events.ts        # /api/events/*
-│   │   ├── internal.ts      # /internal/push-health
-│   │   ├── renewal.ts       # /renew
-│   │   ├── user-center.ts  # /user-center
-│   │   ├── webhook.ts      # WeChat 回调 / BSC 支付 webhook
-│   │   └── wechat-direct.ts # 微信直连登录
-│   └── views/               # 内联 HTML 模板
-├── services/
-│   └── wechatbot-service.ts # 微信机器人: 指令解析、消息构建、Bot 生命周期
-├── shared/
-│   ├── config.ts            # 环境变量配置
-│   ├── types.ts            # 核心类型定义
-│   ├── polling-loop.ts     # 通用轮询循环工具
-│   └── wechat-bind-code.ts
-└── workers/
-    ├── run.ts              # Worker 主循环 (被 PM2 调用)
-    ├── push-worker.ts      # 推送任务: 事件推送 / 续费提醒 / 保活提醒
-    ├── payment-scanner.ts  # BscScan API 轮询支付
-    ├── payment-watcher.ts  # BNB 转账 → 积分 → 延长订阅
-    ├── payment-webhook.ts  # BSC 支付 webhook (Webhook3.io)
-    └── push-monitor.ts     # 推送健康检查 (一次一退出，cron 调用)
-
-scripts/
-├── deploy.sh               # 一键部署脚本 (本地执行)
-└── push-monitor.sh         # push-monitor cron wrapper (部署到服务器后执行)
+regou-app/
+├── src/
+│   ├── adapters/                  # 外部 API 适配层
+│   │   └── wechat-bot.ts          # ilinkai 微信 Bot API 封装
+│   ├── collectors/                 # BSC 链上事件采集器
+│   │   ├── backfill.ts            # 历史事件回填
+│   │   ├── flap.ts                # pump.fun Flap Portal 采集
+│   │   ├── four.ts                # 4-byte 合约采集
+│   │   ├── rpc.ts                 # BSC JSON-RPC 客户端
+│   │   └── run.ts                 # 采集轮询入口
+│   ├── db/
+│   │   ├── migrate.ts             # SQLite 自动迁移
+│   │   ├── sqlite.ts              # DB 连接（bun:sqlite, WAL 模式）
+│   │   └── repositories/          # 数据仓储层
+│   │       ├── entitlements.ts   # 用户套餐权限
+│   │       ├── launch-events.ts   # 链上事件
+│   │       ├── notification-jobs.ts # 推送任务队列
+│   │       ├── push-monitor.ts    # 推送健康记录
+│   │       ├── subscriptions.ts   # 订阅管理
+│   │       └── wechat-bindings.ts # 微信绑定
+│   ├── server/
+│   │   ├── index.ts               # Web 服务器入口 (Hono)
+│   │   ├── app.ts                 # 路由注册
+│   │   ├── middleware/            # 中间件（会话/认证）
+│   │   └── routes/                # API 路由
+│   │       ├── auth.ts            # 钱包签名登录
+│   │       ├── events.ts          # 事件查询 API
+│   │       ├── internal.ts        # 内部监控 API
+│   │       ├── renewal.ts         # 续费页面
+│   │       ├── user-center.ts     # 用户中心
+│   │       ├── webhook.ts         # BSC 转账 Webhook
+│   │       └── wechat-direct.ts   # 微信直接消息
+│   ├── services/
+│   │   └── wechatbot-service.ts   # 机器人指令解析与处理
+│   ├── shared/
+│   │   ├── config.ts              # 环境变量配置
+│   │   └── types.ts               # 全局类型定义
+│   └── workers/
+│       ├── payment-scanner.ts     # 扫描 BSC 链上付款
+│       ├── payment-watcher.ts     # 处理入账，给用户加时长
+│       ├── push-monitor.ts        # 推送健康检查（纯函数，供 cron 调用）
+│       ├── push-worker.ts         # 推送任务生成与派发
+│       └── run.ts                 # Worker 轮询编排
+├── scripts/
+│   ├── deploy.sh                  # 一键部署脚本
+│   └── push-monitor.sh            # 推送监控 cron 脚本（bash + sqlite3）
+├── ecosystem.config.json          # PM2 进程管理配置
+├── package.json
+└── README.md
 ```
 
 ---
 
 ## 核心模块
 
-### 1. 事件采集 (`collectors/`)
+### Collectors — 链上事件采集
 
-- **Flap**: 监听 Flap Portal 合约 `LaunchedToDEX` 事件 (pump.fun)
-- **Four**: 监听 4-byte 合约 `TokenCreated` 事件
-- **GMGN**: 调用 GMGN API 获取实时期权
+| 文件 | 数据源 | 事件类型 |
+|------|--------|----------|
+| `flap.ts` | Flap Portal 合约 (`0x1aDb7...`) | `TokenCreated` (pump.fun) |
+| `four.ts` | 4-byte 合约 (`0x5c952...`) | `TokenCreated` |
+| `backfill.ts` | Flap + GMGN 历史事件 | 回填历史记录 |
+| `rpc.ts` | 任意 BSC RPC | 底层 JSON-RPC 封装，含重试 |
 
-每个事件写入 `launch_events`，通过 `backfill-progress` 跟踪采集进度。
+> **注意**：GMGN 采集在 `backfill.ts` 中，实时采集依赖 Flap Portal 合约事件 + GMGN API 回调查看 `src/collectors/` 目录了解详情。
 
-### 2. 推送任务 (`workers/push-worker.ts`)
+### Workers — 后台任务
 
-`processLaunchPushes()` 在每个新事件写入后，为所有**有效订阅 + 已绑定微信的用户**创建 `notification_jobs`（状态 pending）。
+| Worker | 触发频率 | 职责 |
+|--------|----------|------|
+| `regouapp-collector` | 每 60s | 轮询 BSC 新区块，抓 TokenCreated 事件 |
+| `regouapp-worker` | 每 10s | 为新事件创建 notification_jobs |
+| Queue Poller (`web`) | 每 10s | 消费 pending_wechat_sends，实际发微信 |
+| `payment-scanner` | 每 30s | 扫描 BSC 转账到收款地址 |
+| `push-monitor.sh` | 每 10min (cron) | 检查推送覆盖率 + 链上事件采集健康 |
 
-`dispatchPendingNotificationMessages()` 每 10s 扫描 pending → 读取事件内容 → 找到微信绑定 → 发消息 → 标记 sent。
+### Web Server — HTTP API
 
-另有：
-- `processRenewalReminders()`: 到期前 1 天提醒续费
-- `dispatchPendingSystemMessageJobs()`: 保活提醒（超过 18h 无互动发提醒消息）
-
-### 3. 微信机器人 (`services/wechatbot-service.ts`)
-
-核心逻辑：指令解析 → 权限判断 → 状态查询 → 回复消息。
-
-支持**两套绑定方式**：
-- **直连模式**: 微信用户扫码绑定，用户名=wxid，无需服务器中转
-- **Bot 模式**: 通过 WeChat Bot HTTP API 推送（`sendWechatMessage`）
-
-服务器通过 `bootstrapDirectWeChatBots()` 在启动时恢复所有活跃 Bot 的 WebSocket 连接。
-
-### 4. 推送监控 (`workers/push-monitor.ts`)
-
-一次一退出，被 `scripts/push-monitor.sh`（cron, 每 10 分钟）调用：
-
-**检查 A — 推送覆盖率**  
-查询 `notification_jobs`，对每个事件计算 `sent/eligible` 覆盖率：
-- coverage < 50% → **critical** 告警
-- coverage < 95% → **degraded** 告警
-
-**检查 B — 链上采集健康**  
-直接查 BSC RPC，轮询 Flap/4-byte 合约事件，与 DB `launch_events` 对比，检测漏采集。
-
-结果写入 `push_health_check_results` 和 `push_alerts` 表，可通过 `/internal/push-health` API 访问。
-
-### 5. 支付计费 (`workers/payment-*.ts`)
-
-- **payment-webhook**: BSC 支付 webhook（Webhook3.io），验证签名后调用 watcher
-- **payment-scanner**: BscScan API 兜底轮询，通过 `_meta` 表记录扫描进度
-- **payment-watcher**: 验证收款地址和金额，1 BNB = 30 天 pro，写入 `payment_records` 和 `entitlements`
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/` | GET | 首页：最新发射事件列表 |
+| `/login` | POST | 钱包签名登录 |
+| `/user-center` | GET | 用户中心 |
+| `/renew` | GET/POST | 续费页面 |
+| `/api/events/latest` | GET | 最近事件 JSON |
+| `/api/events/latest/:source` | GET | 按来源过滤 |
+| `/webhook/bnb-transfer` | POST | BSC 转账通知（外部回调） |
+| `/wechat/direct` | GET/POST | 微信直接消息入口 |
+| `/internal/push-health` | GET | 推送健康报告（需 INTERNAL_API_KEY） |
+| `/internal/push-health/latest` | GET | 推送状态简报（ok/degraded/critical） |
 
 ---
 
-## 数据库表
+## 数据库
 
-| 表名 | 用途 |
-|------|------|
-| `users` | 钱包地址登录、会话 |
-| `wechat_bindings` | 钱包 ↔ wxid 绑定关系 |
-| `wechat_bot_bindings` | 独立 Bot 模式的绑定 |
-| `subscriptions` | source (flap/four) × enabled 订阅开关 |
-| `entitlements` | plan_type / status / expires_at |
-| `launch_events` | 链上采集的 Token 事件 |
-| `notification_jobs` | 推送任务 (pending → processing → sent/failed) |
-| `pending_wechat_sends` | 实际发微信的队列 (由 web server 的 queue poller 消费) |
-| `wechat_inbound_events` | 收到的微信消息记录 |
-| `payment_records` | BNB 充值历史 |
-| `backfill_progress` | 各 collector 的采集进度 |
-| `push_health_check_results` | 推送健康检查快照 |
-| `push_alerts` | 推送告警记录 |
+### 表结构总览
+
+```
+launch_events              链上采集的发射事件
+├── id
+├── source (flap/four)
+├── symbol / token_address / launch_tx
+├── event_time
+└── block_number
+
+entitlements               用户套餐权限
+├── user_id / plan_type (free/pro_monthly/pro_yearly)
+├── status (active/expired/revoked)
+└── expires_at
+
+subscriptions              推送订阅开关（per source）
+├── user_id / source (flap/four)
+└── enabled
+
+wechat_bot_bindings        用户微信绑定
+├── user_id / user_wx_id
+├── bot_token / bot_id / account_id
+└── status (active/inactive/expired)
+
+notification_jobs          待推送任务（per user × per event）
+├── user_id / launch_event_id
+└── status (pending/queued/sent/failed)
+
+pending_wechat_sends       微信发送队列
+├── user_wx_id / binding_id / content
+└── status (pending/processing/sent/failed)
+
+push_health_check_results  推送健康记录
+├── checked_at / lookback_hours
+├── events_checked / overall_coverage
+└── collector_ok
+
+push_alerts                推送告警
+├── alert_level (degraded/critical)
+├── message / created_at
+└── acknowledged_at
+```
+
+> 详细 DDL 见 `src/db/migrations/` 目录下的 SQL 文件。
 
 ---
 
-## 机器人指令
+## 微信机器人指令
 
-用户在微信里给机器人发消息，实时响应：
+用户关注微信公众号后，发送以下指令：
 
 | 指令 | 说明 |
 |------|------|
-| `/start` | 开始绑定引导 |
-| `/help` | 显示帮助，含套餐引导 |
-| `/status` | 查看当前订阅状态和推送状态 |
-| `/sub four` | 开启 Four 推送 |
-| `/sub flap` | 开启 Flap 推送 |
-| `/unsub four` | 关闭 Four 推送 |
-| `/unsub flap` | 关闭 Flap 推送 |
-| `/history` | 查看最近事件列表 |
-| `/plans` | 展示月付/年付价格 |
-| `/upgrade` | 获取续费页面链接 |
-
-> **幂等性**: `/sub` 强制开启，`/unsub` 强制关闭，避免 toggle 反转问题。
+| `/start` 或 `/help` | 显示帮助信息 |
+| `/status` | 查看当前套餐 + 订阅状态 |
+| `/sub four` | 开启 Four 发射通知 |
+| `/unsub four` | 关闭 Four 通知 |
+| `/sub flap` | 开启 Flap 发射通知 |
+| `/unsub flap` | 关闭 Flap 通知 |
+| `/plans` | 查看月付/年付套餐详情 |
+| `/upgrade` 或 `/renew` | 跳转续费页面 |
+| `/history` | 最近 10 条发射事件 |
+| `/bnb` | 查看如何用 BNB 续费 |
 
 ---
 
 ## 订阅与计费
 
-| 套餐 | 价格 | 时长 | 来源 |
+### 套餐
+
+| 套餐 | 价格 | 时长 | 推送 |
 |------|------|------|------|
-| Free (试用) | — | 3 天 | 首次登录自动开通 |
-| Pro 月付 | 0.005 BNB | 30 天 | 充值 |
-| Pro 年付 | 0.05 BNB | 365 天 | 充值 |
+| 免费试用 | 0 | 3 天 | Four + Flap 各 1 次 |
+| 专业版月付 | BNB × N | 30 天 | 全量推送 |
+| 专业版年付 | BNB × N × 0.8 | 365 天 | 全量推送 + 优先推送 |
 
-**续费流程**: 用户访问 `/renew` → 页面显示钱包地址 → 转 BNB 到收款地址 → webhook 验证后自动到账。
+### 续费方式
 
-收款地址: `0xaCEa067c6751083e4e652543A436638c1e777777` (config.bnbCollectionWallet)
+在 `regou.app/renew` 页面选择套餐后，系统生成专属 BNB 收款地址。用户向该地址转账任意 BNB，系统按比例折算时长：
+
+```
+1 BNB = 30 天专业版
+```
+
+链上转账后 BSC Webhook (`/webhook/bnb-transfer`) 自动确认，给用户加时长。
 
 ---
 
-## 部署指南
+## 监控与告警
 
-### 一键部署 (本地执行)
+### 推送健康检查
 
 ```bash
+# 手动运行
+bash scripts/push-monitor.sh
+
+# 查看最近告警
+curl -s -H "Authorization: Bearer $INTERNAL_API_KEY" \
+  https://regou.app/internal/push-health
+
+# 简洁状态
+curl -s -H "Authorization: Bearer $INTERNAL_API_KEY" \
+  https://regou.app/internal/push-health/latest
+```
+
+### 推送覆盖率阈值
+
+- **critical**：覆盖率 < 50% 且有用户应收到推送
+- **degraded**：覆盖率 < 95% 且有用户应收到推送
+- **ok**：覆盖率 ≥ 95%
+
+### Cron 配置（服务器）
+
+```bash
+# 每 10 分钟执行一次推送监控
+*/10 * * * * cd /root/regou-app && bash scripts/push-monitor.sh >> logs/push-monitor.log 2>&1
+```
+
+### PM2 进程状态
+
+```bash
+pm2 status
+# regouapp-web          → Web 服务器 + Queue Poller
+# regouapp-collector    → BSC 事件采集
+# regouapp-worker       → 推送任务生成
+```
+
+---
+
+## 部署
+
+### 前提
+
+- 服务器：Linux（已测试 Ubuntu）
+- 工具：bun ≥ 1.0，`pm2`，`sqlite3`（可选，用于 push-monitor.sh）
+- SSH 访问服务器
+
+### 一键部署
+
+```bash
+cd ~/code/regou-app
 bash scripts/deploy.sh
 ```
 
-部署流程：
-1. 压缩源码 → SCP 到服务器 `/root/regou-app.tar.gz`
-2. SSH 远程执行：
-   - `bun install`
-   - 解压覆盖
-   - `pm2 delete all` → `pm2 start ecosystem.config.json`
-   - `pm2 save`
-3. 验证 `curl -sf http://127.0.0.1:30082/`
+> `deploy.sh` 会：
+> 1. 压缩代码 → SCP 上传服务器
+> 2. 服务器安装 bun / pm2 依赖
+> 3. 执行 DB migration
+> 4. `pm2 restart all`
+> 5. 验证 `https://regou.app/` HTTP 200
 
-### 安装 push-monitor cron
-
-部署完成后，在服务器上执行一次：
+### 单独重启服务
 
 ```bash
-# 添加 cron（每 10 分钟执行）
-(crontab -l 2>/dev/null; echo "*/10 * * * * /root/regou-app/scripts/push-monitor.sh >> /root/regou-app/logs/push-monitor.log 2>&1") | crontab -
-
-# 手动触发一次测试
-bash /root/regou-app/scripts/push-monitor.sh
+pm2 restart regouapp-web
+pm2 restart regouapp-collector
+pm2 restart regouapp-worker
 ```
-
-日志在 `/root/regou-app/logs/push-monitor.log`。
 
 ---
 
 ## 环境变量
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `DATABASE_PATH` | `./data/app.sqlite` | SQLite 数据库路径 |
-| `BSC_RPC_URL` | `https://public-bsc.nownodes.io/` | BSC RPC |
-| `PORT` | `30082` | Web 服务器端口 |
-| `COLLECTOR_LOOKBACK_BLOCKS` | `200` | Collector 初始回溯区块数 |
-| `COLLECTOR_BATCH_BLOCKS` | `50` | Collector 每批轮询区块数 |
-| `WECHAT_BOT_API_BASE_URL` | `https://example.invalid/wechat` | WeChat Bot API 地址 |
-| `WECHAT_BOT_API_TOKEN` | `replace-me` | Bot API 认证 Token |
-| `WECHAT_BIND_SECRET` | `dev-wechat-bind-secret` | 微信绑定签名密钥 |
-| `WECHAT_CALLBACK_ALLOWLIST` | `127.0.0.1,::1` | Webhook IP 白名单 |
-| `WECHAT_KEEPALIVE_ENABLED` | `false` | 是否启用保活提醒 |
-| `INTERNAL_API_KEY` | _(无)_ | 内部监控 API 密钥（生产建议设置） |
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `DATABASE_PATH` | SQLite 数据库路径 | `./data/app.sqlite` |
+| `BSC_RPC_URL` | BSC RPC 节点地址 | `https://public-bsc.nownodes.io/` |
+| `COLLECTOR_FROM_BLOCK` | 采集起始区块号 | `35000000` |
+| `COLLECTOR_BATCH_SIZE` | 每批处理区块数 | `2000` |
+| `COLLECTOR_INTERVAL_MS` | 采集间隔（毫秒） | `60000` |
+| `SERVER_PORT` | Web 服务器端口 | `30082` |
+| `SESSION_SECRET` | 会话签名密钥 | `change-me-in-production` |
+| `BNB_COLLECT_WALLET` | BNB 收款地址 | `0x...` |
+| `INTERNAL_API_KEY` | 内部 API 密钥 | `...` |
+| `FLAP_API_BASE_URL` | Flap 后端 API | `https://api.flashrot.com` |
+| `FLAP_API_KEY` | Flap API 密钥 | `...` |
+
+> 环境变量文件：`.env`（本地）、服务器 `/root/regou-app/.env`
 
 ---
 
 ## 开发调试
 
+### 本地运行
+
 ```bash
-# 安装 bun
-curl -fsSL https://bun.sh/install | bash
-
-# 启动 web 服务器（热重载）
+bun install
 bun run src/server/index.ts
+```
 
-# 启动 collector
-bun run src/collectors/run.ts
+### 运行测试
 
-# 启动 worker
-bun run src/workers/run.ts
-
-# 推送健康检查（一次）
-bun run src/workers/push-monitor.ts
-
-# 跑测试
+```bash
 bun test
+```
 
-# 发送测试微信消息
+### 查看数据库
+
+```bash
+bunx bunsqlite inspect ./data/app.sqlite
+# 或
+sqlite3 ./data/app.sqlite
+```
+
+### 模拟发送微信消息
+
+```bash
 bun run scripts/test-send-message.ts
 ```
 
-### 内部监控 API
+### 手动触发一次采集
 
 ```bash
-# 推送健康详情
-curl -H "INTERNAL_API_KEY: xxx" http://localhost:30082/internal/push-health
+bun run src/collectors/run.ts
+```
 
-# 推送状态快速检查
-curl -H "INTERNAL_API_KEY: xxx" http://localhost:30082/internal/push-health/latest
+### 查看 PM2 日志
+
+```bash
+pm2 logs regouapp-web --lines 50
+pm2 logs regouapp-worker --lines 50
+pm2 logs regouapp-collector --lines 50
 ```
 
 ---
 
-## 技术栈
+## 常见问题
 
-- **运行时**: Bun
-- **框架**: Hono
-- **数据库**: SQLite (bun:sqlite, WAL 模式)
-- **部署**: PM2 + bash cron
-- **机器人**: WeChat Bot HTTP API / 直连 WebSocket
-- **区块链**: BSC (Ethereum EVM), JSON-RPC
+**Q: 微信没有收到推送？**
+1. 检查 `pm2 status` 确认三服务全在线
+2. `pm2 logs regouapp-worker` 看 job 是否生成
+3. `pm2 logs regouapp-web` 看 queue poller 是否执行
+4. `SELECT * FROM notification_jobs ORDER BY id DESC LIMIT 10` 查看 job 状态
+
+**Q: ret=-2 错误？**
+外部 ilinkai 微信 Bot API 不可用，该消息已标记为永久失败。如持续出现请联系 Bot API 提供方。
+
+**Q: 新事件没采集到？**
+1. `pm2 logs regouapp-collector` 看采集日志
+2. 检查 `launch_events` 表最新记录时间
+3. 确认 BSC_RPC_URL 可访问
+
+**Q: 如何扩容？**
+- Collector 和 Worker 本身无状态，可水平扩展（共用同一 SQLite WAL 模式支持多读）
+- Queue Poller 只在 Web 服务中，扩展时注意 `pending_wechat_sends` 的 claim 竞争
+
+---
+
+*最后更新：$(git log -1 --format='%ci') · commit $(git rev-parse --short HEAD)*
