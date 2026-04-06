@@ -139,6 +139,16 @@ export function markNotificationJobSent(id: string, sentAt: string) {
   }
 }
 
+export function markNotificationJobQueued(id: string) {
+  const db = openDb();
+
+  try {
+    db.query("update notification_jobs set status = 'queued' where id = ?").run(id);
+  } finally {
+    db.close();
+  }
+}
+
 export function markNotificationJobRetried(id: string, error: string, giveUp: boolean) {
   const db = openDb();
 
@@ -183,6 +193,107 @@ export function markSystemMessageJobRetried(id: string, error: string, failed: b
     db.query(
       "update system_message_jobs set status = ?, attempt_count = attempt_count + 1, last_error = ? where id = ?",
     ).run(failed ? "failed" : "pending", error, id);
+  } finally {
+    db.close();
+  }
+}
+
+// ─── Pending WeChat Sends Queue ───────────────────────────────────────────────
+
+export type PendingWechatSend = {
+  id: string;
+  notification_job_id: string | null;
+  binding_id: string;
+  user_wx_id: string;
+  content: string;
+  status: string;
+  attempt_count: number;
+  last_error: string | null;
+  created_at: string;
+  sent_at: string | null;
+};
+
+export function enqueueWechatSend(params: {
+  bindingId: string;
+  userWxId: string;
+  content: string;
+  notificationJobId?: string;
+}): string {
+  const db = openDb();
+  const id = crypto.randomUUID();
+  try {
+    db.query(
+      `insert into pending_wechat_sends (id, notification_job_id, binding_id, user_wx_id, content, status, attempt_count, created_at)
+       values (?, ?, ?, ?, ?, 'pending', 0, ?)`,
+    ).run(id, params.notificationJobId ?? null, params.bindingId, params.userWxId, params.content, new Date().toISOString());
+    return id;
+  } finally {
+    db.close();
+  }
+}
+
+export function claimPendingWechatSends(limit = 50): PendingWechatSend[] {
+  const db = openDb();
+  try {
+    db.exec("begin immediate");
+    const rows = db
+      .query(
+        `select id, binding_id, user_wx_id, content, status, attempt_count, last_error, created_at, sent_at
+         from pending_wechat_sends
+         where status = 'pending'
+         order by datetime(created_at) asc
+         limit ?`,
+      )
+      .all(limit) as PendingWechatSend[];
+
+    if (rows.length === 0) {
+      db.exec("commit");
+      return [];
+    }
+
+    const placeholders = rows.map(() => "?").join(", ");
+    const ids = rows.map((r) => r.id);
+    db.query(
+      `update pending_wechat_sends set status = 'processing', attempt_count = attempt_count + 1 where status = 'pending' and id in (${placeholders})`,
+    ).run(...ids);
+    db.exec("commit");
+    return rows;
+  } catch (error) {
+    try { db.exec("rollback"); } catch { /* ignore */ }
+    throw error;
+  } finally {
+    db.close();
+  }
+}
+
+export function markWechatSendSent(id: string) {
+  const db = openDb();
+  try {
+    db.query("update pending_wechat_sends set status = 'sent', sent_at = ?, last_error = null where id = ?").run(
+      new Date().toISOString(),
+      id,
+    );
+  } finally {
+    db.close();
+  }
+}
+
+export function markWechatSendFailed(id: string, error: string) {
+  const db = openDb();
+  try {
+    db.query("update pending_wechat_sends set status = 'failed', last_error = ? where id = ?").run(error, id);
+  } finally {
+    db.close();
+  }
+}
+
+export function markNotificationJobDone(id: string) {
+  const db = openDb();
+  try {
+    db.query("update notification_jobs set status = 'sent', sent_at = ? where id = ?").run(
+      new Date().toISOString(),
+      id,
+    );
   } finally {
     db.close();
   }

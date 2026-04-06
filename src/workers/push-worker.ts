@@ -9,6 +9,8 @@ import {
   claimPendingSystemMessageJobs,
   createNotificationJob,
   createSystemMessageJob,
+  enqueueWechatSend,
+  markNotificationJobQueued,
   markNotificationJobRetried,
   markNotificationJobSent,
   markSystemMessageJobRetried,
@@ -238,9 +240,24 @@ export async function dispatchPendingNotificationMessages() {
       console.log(`[push] SENT user=${job.user_id} event=${job.launch_event_id} token=${launch.token_address} symbol=${launch.symbol ?? "null"} source=${launch.source} at=${sentAt}`);
     } catch (error) {
       const msg = getErrorMessage(error);
-      const giveUp = msg.startsWith("binding missing");
-      console.log(`[push] FAIL user=${job.user_id} event=${job.launch_event_id} token=${launch.token_address} symbol=${launch.symbol ?? "null"} error=${msg}`);
-      markNotificationJobRetried(job.id, msg, giveUp);
+      if (msg.startsWith("WECHAT_BOT_INACTIVE")) {
+        // Queue for web server to send via its active bots
+        enqueueWechatSend({
+          bindingId: wechatBinding.id,
+          userWxId: wechatBinding.user_wx_id,
+          content: text,
+          notificationJobId: job.id,
+        });
+        markNotificationJobQueued(job.id);
+        console.log(`[push] QUEUED user=${job.user_id} event=${job.launch_event_id} token=${launch.token_address} symbol=${launch.symbol ?? "null"} via web server`);
+      } else if (msg.startsWith("binding missing")) {
+        console.log(`[push] SKIP no binding user=${job.user_id} event=${job.launch_event_id} token=${launch.token_address} symbol=${launch.symbol ?? "null"}`);
+        markNotificationJobRetried(job.id, msg, true);
+      } else {
+        // Transient error — retry next cycle
+        console.log(`[push] FAIL user=${job.user_id} event=${job.launch_event_id} token=${launch.token_address} symbol=${launch.symbol ?? "null"} error=${msg}`);
+        markNotificationJobRetried(job.id, msg, false);
+      }
     }
   }
 

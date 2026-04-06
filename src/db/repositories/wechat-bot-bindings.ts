@@ -37,6 +37,23 @@ export function findActiveBindingByUserId(userId: string): WechatBotBinding | nu
   }
 }
 
+export function findActiveBindingByWxId(wxId: string): WechatBotBinding | null {
+  const db = openDb(databasePath());
+  try {
+    const binding = db
+      .query(`
+        SELECT id, user_id, bot_token, bot_id, account_id, user_wx_id, base_url,
+               status, bound_at, last_poll_at, last_message_at, created_at, updated_at
+        FROM wechat_bot_bindings
+        WHERE user_wx_id = ? AND status = 'active'
+      `)
+      .get(wxId) as WechatBotBinding | null;
+    return binding;
+  } finally {
+    db.close();
+  }
+}
+
 export function createBinding(params: {
   id: string;
   user_id: string;
