@@ -11,7 +11,6 @@
  * coverage drops below configured thresholds.
  */
 
-import { runMigrations } from "../db/migrate";
 import { config } from "../shared/config";
 import {
   getPushHealthRecords,
@@ -332,8 +331,6 @@ export async function runPushMonitorLoop(
 // ─── One-shot entry (used by run.ts, and can be run directly for local testing) ─
 
 if (import.meta.main) {
-  runMigrations(process.env.DATABASE_PATH);
-  // Default: run once then exit (local testing / cron wrapper)
   runPushMonitorCheck()
     .then(() => process.exit(0))
     .catch((err) => {

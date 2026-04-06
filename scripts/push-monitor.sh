@@ -30,7 +30,10 @@ export PATH="$HOME/.bun/bin:$HOME/.local/bin:$HOME/npm/bin:$PATH"
 TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 echo "[$TIMESTAMP] push-monitor start" >> "$LOG_FILE"
 
-# 最多运行 5 分钟，然后强制退出（防止 BSC RPC 卡死）
+# 1. 先跑 pending migrations（确保新表已创建）
+bun run src/db/migrate-cli.ts >> "$LOG_FILE" 2>&1
+
+# 2. 跑推送健康检查（最多 5 分钟，防止 BSC RPC 卡死）
 timeout 300 bun run src/workers/push-monitor.ts >> "$LOG_FILE" 2>&1
 EXIT_CODE=$?
 
