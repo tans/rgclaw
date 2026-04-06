@@ -54,35 +54,20 @@ function buildHelpText(): string {
 /help — 显示此帮助`;
 }
 
-function buildStartText(hasSubscription: boolean): string {
-  if (hasSubscription) {
-    return `👋 欢迎回来！
-
-您已绑定 regou.app，发射事件推送已开启。
-
-当前可用命令：
-/start — 显示此消息
-/status — 查看订阅状态
-/sub four · /sub flap — 管理推送
-/history — 查看发射记录
-/bnb — 查询 BNB 价格
-/help — 全部命令
-
-有疑问？前往 regou.app 查看完整说明。`;
+function buildStartText(entitlement: { plan_type: string; expires_at: string } | null): string {
+  const hasSub = !!entitlement;
+  if (hasSub) {
+    const expiresAt = new Date(entitlement!.expires_at);
+    const now = Date.now();
+    const remainingMs = expiresAt.getTime() - now;
+    const remainingDays = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
+    const isTrial = entitlement!.plan_type === "trial";
+    const subLine = isTrial
+      ? `📋 您的订阅状态：试用（剩余 ${remainingDays} 天）\n\n开通付费版即可持续接收 Four / Flap 代币发射推送。\n前往 regou.app 购买专业版。`
+      : `📋 您的订阅状态：${entitlement!.plan_type === "pro" ? "专业版" : entitlement!.plan_type}\n\nFour / Flap 代币发射推送已开启。`;
+    return `👋 欢迎回来！\n\n您已绑定 regou.app，发射事件推送已开启。\n\n${subLine}\n\n当前可用命令：\n/start — 显示此消息\n/status — 查看订阅状态\n/sub four · /sub flap — 管理推送\n/history — 查看发射记录\n/bnb — 查询 BNB 价格\n/help — 全部命令\n\n有疑问？前往 regou.app 查看完整说明。`;
   }
-  return `👋 欢迎使用 regou.app！
-
-您已成功绑定微信，当前为试用用户。
-
-📋 您的订阅状态：试用（剩余 3 天）
-
-开通付费版即可持续接收 Four / Flap 代币发射推送。
-前往 regou.app 购买专业版。
-
-当前可用命令：
-/start — 显示此消息
-/status — 查看订阅详情
-/help — 全部命令`;
+  return `👋 欢迎使用 regou.app！\n\n您已成功绑定微信，当前为试用用户。\n\n📋 您的订阅状态：试用（剩余 3 天）\n\n开通付费版即可持续接收 Four / Flap 代币发射推送。\n前往 regou.app 购买专业版。\n\n当前可用命令：\n/start — 显示此消息\n/status — 查看订阅详情\n/help — 全部命令`;
 }
 
 function buildStatusText(entitlement: { plan_type: string; expires_at: string }, userId: string): string {
@@ -147,7 +132,7 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
 
       if (cmd === "start") {
         const hasSub = !!entitlement;
-        await bot.reply(msg, buildStartText(hasSub));
+        await bot.reply(msg, buildStartText(entitlement));
         return;
       }
 
