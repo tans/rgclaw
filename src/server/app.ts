@@ -8,6 +8,7 @@ import { userCenterRoutes } from "./routes/user-center";
 import { webhookRoutes } from "./routes/webhook";
 import { wechatDirectRoutes } from "./routes/wechat-direct";
 import { eventsRoutes } from "./routes/events";
+import { internalRoutes } from "./routes/internal";
 import { renderHomePage } from "./views/home";
 
 export function createApp() {
@@ -20,6 +21,9 @@ export function createApp() {
 
   // Public API routes — no session needed
   app.route("/", eventsRoutes());
+
+  // Internal monitoring API — protected by INTERNAL_API_KEY
+  app.route("/", internalRoutes());
 
   app.use("*", sessionMiddleware);
 

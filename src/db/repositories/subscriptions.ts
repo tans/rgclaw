@@ -66,3 +66,20 @@ export function toggleSubscription(userId: string, source: string): boolean {
     db.close();
   }
 }
+
+export function setSubscriptionState(userId: string, source: string, enabled: boolean): boolean {
+  const db = openDb();
+  try {
+    const result = db
+      .query(
+        `UPDATE user_source_subscriptions
+         SET enabled = ?,
+             updated_at = ?
+         WHERE user_id = ? AND source = ?`
+      )
+      .run(enabled ? 1 : 0, new Date().toISOString(), userId, source);
+    return result.changes > 0;
+  } finally {
+    db.close();
+  }
+}

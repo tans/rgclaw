@@ -1,7 +1,7 @@
 import { WeChatBot } from "@wechatbot/wechatbot";
 import { listLatestLaunchEvents } from "../db/repositories/launch-events";
 import { getActiveEntitlement } from "../db/repositories/entitlements";
-import { listSubscriptions, toggleSubscription } from "../db/repositories/subscriptions";
+import { listSubscriptions, setSubscriptionState } from "../db/repositories/subscriptions";
 import { getAllActiveBindings, type WechatBotBinding, updateLastMessageTime } from "../db/repositories/wechat-bot-bindings";
 
 const activeBots = new Map<string, WeChatBot>();
@@ -51,6 +51,8 @@ function buildHelpText(): string {
 /unsub flap — 关闭 Flap 推送
 /history — 查看最近发射记录
 /bnb — 查询 BNB 当前价格
+/plans — 查看套餐与价格
+/upgrade — 立即前往续费页
 /help — 显示此帮助`;
 }
 
@@ -70,18 +72,47 @@ function buildStartText(entitlement: { plan_type: string; expires_at: string } |
   return `👋 欢迎使用 regou.app！\n\n您已成功绑定微信，当前为试用用户。\n\n📋 您的订阅状态：试用（剩余 3 天）\n\n开通付费版即可持续接收 Four / Flap 代币发射推送。\n前往 regou.app 购买专业版。\n\n当前可用命令：\n/start — 显示此消息\n/status — 查看订阅详情\n/help — 全部命令`;
 }
 
+function planLabel(planType: string): string {
+  if (planType === "trial") return "试用";
+  if (planType === "pro" || planType === "pro_monthly") return "专业版（月付）";
+  if (planType === "pro_yearly") return "专业版（年付）";
+  return planType;
+}
+
 function buildStatusText(entitlement: { plan_type: string; expires_at: string }, userId: string): string {
-  const plan = entitlement.plan_type === "trial" ? "试用" : entitlement.plan_type === "pro" ? "专业版" : entitlement.plan_type;
+  const plan = planLabel(entitlement.plan_type);
   const expires = new Date(entitlement.expires_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
   const subs = listSubscriptions(userId);
   const fourOn = subs.find(s => s.source === "four")?.enabled === 1;
   const flapOn = subs.find(s => s.source === "flap")?.enabled === 1;
-  return `📋 订阅状态\n\n套餐: ${plan}\n到期: ${expires}\n\nFour 推送: ${fourOn ? "✅ 开启" : "❌ 关闭"}\nFlap 推送: ${flapOn ? "✅ 开启" : "❌ 关闭"}`;
+  return `📋 订阅状态\n\n套餐: ${plan}\n到期: ${expires}\n\nFour 推送: ${fourOn ? "✅ 开启" : "❌ 关闭"}\nFlap 推送: ${flapOn ? "✅ 开启" : "❌ 关闭"}\n\n输入 /plans 查看套餐，输入 /upgrade 立即续费。`;
 }
 
 function buildToggleResult(source: string, newState: boolean): string {
   const label = source === "four" ? "Four" : "Flap";
   return `${label} 推送已${newState ? "开启" : "关闭"} ✅`;
+}
+
+function buildPlansText(): string {
+  return `💳 Regou 套餐
+
+月付：0.005 BNB（30 天）
+年付：0.045 BNB（365 天，省 25%）
+
+付款后自动上链检测并续期。
+前往 regou.app/renew 完成续费。`;
+}
+
+function buildUpgradeText(): string {
+  return `🚀 立即升级
+
+请打开：
+https://regou.app/renew
+
+你将获得：
+• Four / Flap 实时微信推送
+• 可持续不中断接收发射事件
+• 月付/年付灵活选择`;
 }
 
 function buildHistoryText(userId: string): string {
@@ -155,7 +186,7 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
             await bot.reply(msg, "用法: /sub four 或 /sub flap");
             return;
           }
-          toggleSubscription(binding.user_id, source);
+          setSubscriptionState(binding.user_id, source, true);
           await bot.reply(msg, buildToggleResult(source, true));
           return;
         }
@@ -167,7 +198,7 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
             await bot.reply(msg, "用法: /unsub four 或 /unsub flap");
             return;
           }
-          toggleSubscription(binding.user_id, source);
+          setSubscriptionState(binding.user_id, source, false);
           await bot.reply(msg, buildToggleResult(source, false));
           return;
         }
@@ -183,6 +214,16 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
           await bot.reply(msg, `🪙 BNB 当前价格\n\n${price}\n\n数据来源: Binance`);
           return;
         }
+
+        case "plans":
+        case "套餐":
+          await bot.reply(msg, buildPlansText());
+          return;
+
+        case "upgrade":
+        case "续费":
+          await bot.reply(msg, buildUpgradeText());
+          return;
 
         default:
           await bot.reply(msg, buildUnknownCommand(cmd));
