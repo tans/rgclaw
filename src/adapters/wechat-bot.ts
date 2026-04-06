@@ -69,5 +69,15 @@ export function buildLaunchMessage(tokenAddress: string, source: string, symbol?
 }
 
 export function buildRenewalReminder(expiresAt: string) {
-  return `⏰ 你的推送服务将于 ${expiresAt} 到期。续费后不中断服务，继续享受 Four / Flap 第一时间通知。`;
+  return [
+    "⏰ 推送服务即将到期",
+    "",
+    `到期时间：${expiresAt}`,
+    "到期后发射推送将中断，不再收到 Four / Flap 通知。",
+    "",
+    "立即续费，不中断推送：",
+    "👉 regou.app/renew",
+    "",
+    `套餐：月付 0.005 BNB，年付 0.045 BNB（省 25%）`,
+  ].join("\n");
 }
