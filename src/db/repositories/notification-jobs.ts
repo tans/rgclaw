@@ -266,13 +266,20 @@ export function claimPendingWechatSends(limit = 50): PendingWechatSend[] {
   }
 }
 
-export function markWechatSendSent(id: string) {
+export function markWechatSendSent(id: string, notificationJobId?: string | null) {
   const db = openDb();
   try {
+    const sentAt = new Date().toISOString();
     db.query("update pending_wechat_sends set status = 'sent', sent_at = ?, last_error = null where id = ?").run(
-      new Date().toISOString(),
+      sentAt,
       id,
     );
+    // Also mark the parent notification_job as sent so push coverage is accurate.
+    if (notificationJobId) {
+      db.query(
+        "update notification_jobs set status = 'sent', sent_at = ? where id = ? and status != 'sent'",
+      ).run(sentAt, notificationJobId);
+    }
   } finally {
     db.close();
   }

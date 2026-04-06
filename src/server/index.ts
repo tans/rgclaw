@@ -57,7 +57,7 @@ setInterval(() => {
       }
       try {
         await sendMessage(binding, send.user_wx_id, send.content);
-        markWechatSendSent(send.id);
+        markWechatSendSent(send.id, send.notification_job_id);
         if (send.notification_job_id) {
           markNotificationJobDone(send.notification_job_id);
         }
