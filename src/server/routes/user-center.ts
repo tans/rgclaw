@@ -35,6 +35,7 @@ export function userCenterRoutes() {
       const directBinding = findActiveBindingByUserId(userId);
 
       const justBound = c.req.query("bound") === "1";
+      const showNewUserMessageReminder = !!directBinding && !directBinding.last_message_at;
 
       let trialDaysLeft: number | undefined;
       if (entitlement?.plan_type === "trial") {
@@ -67,6 +68,7 @@ export function userCenterRoutes() {
           bindingStatusText,
           bound: isBound,
           justBound,
+          showNewUserMessageReminder,
           trialDaysLeft,
         }),
       );

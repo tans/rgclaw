@@ -53,10 +53,14 @@ export function wechatDirectRoutes() {
         });
         const newBinding = findActiveBindingByUserId(userId);
         if (newBinding) {
-          await startBotForBinding(newBinding);
+          try {
+            await startBotForBinding(newBinding);
+          } catch (err) {
+            console.warn("startBotForBinding failed after QR bind:", err);
+          }
         }
         clearQRStatus(userId);
-        return c.json({ status: "bound", redirect: "/wechat/direct/bind" });
+        return c.json({ status: "bound", redirect: "/me?bound=1" });
       }
     }
     return c.json({ status: status.status, qrCodeUrl: status.qrCodeUrl, error: status.error });

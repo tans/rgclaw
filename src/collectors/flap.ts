@@ -9,7 +9,7 @@ import {
 
 export const FLAP_PORTAL_ADDRESS = "0xe2ce6ab80874fa9fa2aae65d277dd6b8e65c9de0";
 export const FLAP_LAUNCHED_TOPIC =
-  "0x115c78ad17c4763fb97bca94f3e59dc8cb2e59c9d3862f24a694ec401200f562";
+  "0x0211b2657ce697a4ae4094c380930e4fef6274527a0a2d10f3a319ef6abf6bd5"; // LaunchedToDEX
 
 export type FlapLaunchLog = {
   transactionHash: string;

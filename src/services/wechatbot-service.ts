@@ -2,7 +2,7 @@ import { WeChatBot } from "@wechatbot/wechatbot";
 import { listLatestLaunchEvents } from "../db/repositories/launch-events";
 import { getActiveEntitlement } from "../db/repositories/entitlements";
 import { listSubscriptions, toggleSubscription } from "../db/repositories/subscriptions";
-import { getAllActiveBindings, type WechatBotBinding } from "../db/repositories/wechat-bot-bindings";
+import { getAllActiveBindings, type WechatBotBinding, updateLastMessageTime } from "../db/repositories/wechat-bot-bindings";
 
 const activeBots = new Map<string, WeChatBot>();
 
@@ -24,7 +24,7 @@ const qrStatusStore = new Map<string, QRCodeStatus>();
 
 const QR_GENERATION_TIMEOUT_MS = 60 * 1000;
 
-const AUTO_REPLY_MESSAGE = "发射事件监听已开启，更多功能开发中。";
+const AUTO_REPLY_MESSAGE = "收到！发送 /help 查看全部可用命令，/start 重新显示欢迎信息。";
 
 async function fetchBnbPrice(): Promise<string> {
   try {
@@ -43,6 +43,7 @@ async function fetchBnbPrice(): Promise<string> {
 function buildHelpText(): string {
   return `📖 regou.app 命令帮助
 
+/start — 重新显示欢迎信息
 /status — 查看订阅状态
 /sub four — 开启 Four 推送
 /sub flap — 开启 Flap 推送
@@ -51,6 +52,37 @@ function buildHelpText(): string {
 /history — 查看最近发射记录
 /bnb — 查询 BNB 当前价格
 /help — 显示此帮助`;
+}
+
+function buildStartText(hasSubscription: boolean): string {
+  if (hasSubscription) {
+    return `👋 欢迎回来！
+
+您已绑定 regou.app，发射事件推送已开启。
+
+当前可用命令：
+/start — 显示此消息
+/status — 查看订阅状态
+/sub four · /sub flap — 管理推送
+/history — 查看发射记录
+/bnb — 查询 BNB 价格
+/help — 全部命令
+
+有疑问？前往 regou.app 查看完整说明。`;
+  }
+  return `👋 欢迎使用 regou.app！
+
+您已成功绑定微信，当前为试用用户。
+
+📋 您的订阅状态：试用（剩余 3 天）
+
+开通付费版即可持续接收 Four / Flap 代币发射推送。
+前往 regou.app 购买专业版。
+
+当前可用命令：
+/start — 显示此消息
+/status — 查看订阅详情
+/help — 全部命令`;
 }
 
 function buildStatusText(entitlement: { plan_type: string; expires_at: string }, userId: string): string {
@@ -80,7 +112,7 @@ function buildHistoryText(userId: string): string {
 }
 
 function buildUnknownCommand(cmd: string): string {
-  return `未知命令: /${cmd}\n\n输入 /help 查看可用命令`;
+  return `未知命令: /${cmd}\n\n输入 /help 查看可用命令，或 /start 重新显示欢迎信息`;
 }
 
 function buildNotBoundText(): string {
@@ -96,6 +128,7 @@ function buildNoSubscriptionText(): string {
 function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => Promise<void> {
   return async (msg: any) => {
     if (msg.type !== "text" || !msg.text || msg.isFromSelf) return;
+    updateLastMessageTime(binding.id);
 
     const entitlement = getActiveEntitlement(binding.user_id);
     const text = (msg.text || "").trim();
@@ -109,6 +142,12 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
       // Commands that work without subscription check
       if (cmd === "help" || cmd === "帮助") {
         await bot.reply(msg, buildHelpText());
+        return;
+      }
+
+      if (cmd === "start") {
+        const hasSub = !!entitlement;
+        await bot.reply(msg, buildStartText(hasSub));
         return;
       }
 
@@ -325,6 +364,10 @@ export function getQRStatus(userId: string): QRCodeStatus | undefined {
 
 export function clearQRStatus(userId: string): void {
   qrStatusStore.delete(userId);
+}
+
+export function setQRStatusForTesting(userId: string, status: QRCodeStatus): void {
+  qrStatusStore.set(userId, status);
 }
 
 export function startBotForBinding(binding: WechatBotBinding): Promise<void> {

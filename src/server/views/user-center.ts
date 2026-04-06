@@ -9,6 +9,7 @@ type RenderUserCenterInput = {
   bindingStatusText: string;
   bound: boolean;
   justBound?: boolean;
+  showNewUserMessageReminder?: boolean;
   trialDaysLeft?: number;
 };
 
@@ -185,6 +186,7 @@ export function renderUserCenter(input: RenderUserCenterInput) {
     .banner .btn:hover { background: rgba(255,255,255,0.3); }
     .banner.success { background: linear-gradient(135deg, #059669, #10b981); }
     .banner.warning { background: linear-gradient(135deg, #d97706, #f59e0b); }
+    .banner.notice { background: linear-gradient(135deg, #2563eb, #3b82f6); }
     .checklist { margin-top: 20px; }
     .check-item {
       display: flex;
@@ -293,7 +295,16 @@ export function renderUserCenter(input: RenderUserCenterInput) {
       <h2>🎉 绑定成功！</h2>
       <p>你的微信已成功连接。从现在起，Four / Flap 发射事件会第一时间推送到你的微信。</p>
     </div>
-    ` : !input.bound ? `
+    ` : ""}
+
+    ${input.showNewUserMessageReminder ? `
+    <div class="banner notice">
+      <h2>新用户请先发一条消息</h2>
+      <p>请先在微信里给机器人随便发一条消息，否则平台暂时无法主动给你发消息。</p>
+    </div>
+    ` : ""}
+
+    ${!input.bound ? `
     <div class="banner">
       <h2>👋 欢迎使用 Regou.app！</h2>
       <p>完成以下步骤，开始接收 Meme 发射通知：</p>

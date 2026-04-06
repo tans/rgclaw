@@ -16,10 +16,12 @@ export type WechatBotBinding = {
   updated_at: string;
 };
 
-const DB_PATH = process.env.DATABASE_PATH ?? "./data/app.sqlite";
+function databasePath() {
+  return process.env.DATABASE_PATH ?? "./data/app.sqlite";
+}
 
 export function findActiveBindingByUserId(userId: string): WechatBotBinding | null {
-  const db = openDb(DB_PATH);
+  const db = openDb(databasePath());
   try {
     const binding = db
       .query(`
@@ -44,7 +46,7 @@ export function createBinding(params: {
   user_wx_id: string;
   base_url?: string;
 }): WechatBotBinding {
-  const db = openDb(DB_PATH);
+  const db = openDb(databasePath());
   const now = new Date().toISOString();
   try {
     db.query(`
@@ -85,7 +87,7 @@ export function createBinding(params: {
 }
 
 export function deactivateBinding(bindingId: string): void {
-  const db = openDb(DB_PATH);
+  const db = openDb(databasePath());
   const now = new Date().toISOString();
   try {
     db.query(`
@@ -99,7 +101,7 @@ export function deactivateBinding(bindingId: string): void {
 }
 
 export function updateLastPollTime(bindingId: string): void {
-  const db = openDb(DB_PATH);
+  const db = openDb(databasePath());
   const now = new Date().toISOString();
   try {
     db.query(`
@@ -113,7 +115,7 @@ export function updateLastPollTime(bindingId: string): void {
 }
 
 export function updateLastMessageTime(bindingId: string): void {
-  const db = openDb(DB_PATH);
+  const db = openDb(databasePath());
   const now = new Date().toISOString();
   try {
     db.query(`
@@ -127,7 +129,7 @@ export function updateLastMessageTime(bindingId: string): void {
 }
 
 export function getAllActiveBindings(): WechatBotBinding[] {
-  const db = openDb(DB_PATH);
+  const db = openDb(databasePath());
   try {
     const bindings = db
       .query(`

@@ -225,6 +225,7 @@ export async function dispatchPendingNotificationMessages() {
 
     const wechatBinding = findActiveBindingByUserId(job.user_id);
     if (!wechatBinding) {
+      console.log(`[push] SKIP no binding user=${job.user_id} event=${job.launch_event_id} token=${launch.token_address} symbol=${launch.symbol ?? "null"}`);
       markNotificationJobRetried(job.id, "binding missing", true);
       continue;
     }
@@ -234,9 +235,11 @@ export async function dispatchPendingNotificationMessages() {
       const sentAt = new Date().toISOString();
       markNotificationJobSent(job.id, sentAt);
       sent += 1;
+      console.log(`[push] SENT user=${job.user_id} event=${job.launch_event_id} token=${launch.token_address} symbol=${launch.symbol ?? "null"} source=${launch.source} at=${sentAt}`);
     } catch (error) {
       const msg = getErrorMessage(error);
       const giveUp = msg.startsWith("binding missing");
+      console.log(`[push] FAIL user=${job.user_id} event=${job.launch_event_id} token=${launch.token_address} symbol=${launch.symbol ?? "null"} error=${msg}`);
       markNotificationJobRetried(job.id, msg, giveUp);
     }
   }
