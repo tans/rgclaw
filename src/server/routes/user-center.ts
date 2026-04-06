@@ -124,7 +124,7 @@ export function userCenterRoutes() {
       if (msg.startsWith("WECHAT_BOT_INACTIVE:")) {
         return c.json({ error: "微信机器人已离线，请重新绑定" }, 409);
       }
-      return c.json({ error: "发送失败" }, 500);
+      return c.json({ error: msg }, 500);
     }
   });
 

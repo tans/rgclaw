@@ -248,6 +248,36 @@ export function renderUserCenter(input: RenderUserCenterInput) {
       color: #999;
       font-family: monospace;
     }
+    #errorModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    #errorModal.show { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px 24px;
+      max-width: 360px;
+      width: 90%;
+      text-align: center;
+    }
+    .modal-box h3 { margin: 0 0 12px; font-size: 16px; color: #333; }
+    .modal-box p { margin: 0 0 20px; font-size: 14px; color: #666; word-break: break-all; }
+    .modal-box button {
+      background: rgb(7,193,96);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 32px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .modal-box button:hover { opacity: 0.85; }
   </style>
 </head>
 <body>
@@ -354,11 +384,13 @@ export function renderUserCenter(input: RenderUserCenterInput) {
           btn.textContent = "已发送 " + data.emoji;
           setTimeout(() => { btn.textContent = "发送消息"; btn.disabled = false; }, 1500);
         } else {
-          btn.textContent = data.error || "发送失败";
+          document.getElementById("errorModalMsg").textContent = data.error || "发送失败";
+          document.getElementById("errorModal").classList.add("show");
           setTimeout(() => { btn.textContent = "发送消息"; btn.disabled = false; }, 1500);
         }
       } catch {
-        btn.textContent = "发送失败";
+        document.getElementById("errorModalMsg").textContent = "发送失败，请稍后重试";
+        document.getElementById("errorModal").classList.add("show");
         setTimeout(() => { btn.textContent = "发送消息"; btn.disabled = false; }, 1500);
       }
     });
@@ -371,6 +403,13 @@ export function renderUserCenter(input: RenderUserCenterInput) {
       ${subscriptionItems || "<p style='color:#888;font-size:13px;'>暂无订阅</p>"}
     </div>
     ` : ""}
+  </div>
+  <div id="errorModal">
+    <div class="modal-box">
+      <h3>发送失败</h3>
+      <p id="errorModalMsg"></p>
+      <button onclick="document.getElementById('errorModal').classList.remove('show')">好的</button>
+    </div>
   </div>
 </body>
 </html>`;
