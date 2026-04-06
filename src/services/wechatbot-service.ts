@@ -330,8 +330,22 @@ export function clearQRStatus(userId: string): void {
 export function startBotForBinding(binding: WechatBotBinding): Promise<void> {
   if (activeBots.has(binding.id)) return Promise.resolve();
 
-  // Use per-binding storage so each bot's credentials are isolated
+  // Per-binding storage so each bot's credentials are isolated
   const storageDir = `/root/.wechatbot/${binding.id}`;
+
+  // Pre-populate credentials at per-binding path using data from DB.
+  // This avoids relying on the SDK's QR login flow to store credentials at the right place.
+  // The SDK's FileStorage stores credentials at {storageDir}/credentials.json.
+  const { mkdirSync, writeFileSync } = require("fs");
+  mkdirSync(storageDir, { recursive: true, mode: 0o700 });
+  const creds = {
+    token: binding.bot_token,
+    baseUrl: binding.base_url,
+    accountId: binding.bot_id,
+    userId: binding.user_wx_id,
+    savedAt: new Date().toISOString(),
+  };
+  writeFileSync(`${storageDir}/credentials.json`, JSON.stringify(creds, null, 2) + "\n", { mode: 0o600 });
 
   const bot = new WeChatBot({
     baseUrl: binding.base_url,
@@ -343,7 +357,6 @@ export function startBotForBinding(binding: WechatBotBinding): Promise<void> {
 
   const messageHandler = makeMessageHandler(bot, binding);
 
-  // Set up auto-reply for incoming messages
   (bot as any).onMessage(async (msg: any) => {
     try {
       await messageHandler(msg);
@@ -352,16 +365,11 @@ export function startBotForBinding(binding: WechatBotBinding): Promise<void> {
     }
   });
 
-  // login() restores session from FileStorage (~/.wechatbot/) if credentials were
-  // previously saved during QR bind. Only add bot to activeBots AFTER login succeeds.
-  // If login fails (timeout, expired creds, etc.) the stored creds are invalid —
-  // delete them so the user can re-bind via QR code without stale state interfering.
   return new Promise<void>((resolve, reject) => {
     (bot as any).login()
       .then(() => {
         activeBots.set(binding.id, bot);
         console.log(`[wechatbot] bot ${binding.id} logged in, starting WebSocket...`);
-        // start() in background — don't block the caller
         (bot as any).start().catch((err: unknown) => {
           console.warn(`[wechatbot] bot ${binding.id} WebSocket error:`, err instanceof Error ? err.message : String(err));
         });
@@ -370,7 +378,6 @@ export function startBotForBinding(binding: WechatBotBinding): Promise<void> {
       .catch(async (err: unknown) => {
         const errMsg = err instanceof Error ? err.message : String(err);
         console.warn(`[wechatbot] bot ${binding.id} login failed (${errMsg}), clearing stale creds...`);
-        // Delete stale storage so re-bind works cleanly
         try {
           const { existsSync, rmSync } = require("fs");
           if (existsSync(storageDir)) {
