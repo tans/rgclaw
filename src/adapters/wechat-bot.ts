@@ -5,7 +5,7 @@ export function buildBindingSuccessMessage() {
 }
 
 export function buildGenericWechatAutoReply() {
-  return [n    "👋 收到消息！",n    "",n    "发送 /help 查看全部可用命令",n    "发送 /plans 查看套餐与价格",n    "发送 /status 查看订阅状态",n    "",n    "查询和狙击功能开发中 🚀",n  ].join("\n");
+  return "查询和狙击功能开发中，敬请期待 🚀";
 }
 
 export function buildUnboundWechatReply() {
