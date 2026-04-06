@@ -104,7 +104,7 @@ export function getPushHealthRecords(sinceHoursAgo = 24, limit = 50): PushHealth
         left join (
           select launch_event_id,
             min(
-              cast((julianday(nj.sent_at) - julianday(le2.event_time)) * 86400 * 1000 as integer)
+              cast((julianday(nj.sent_at) - julianday(le2.event_time, '+08:00')) * 86400 * 1000 as integer)
             ) as first_sent_latency_ms
           from notification_jobs nj
           join launch_events le2 on le2.id = nj.launch_event_id
@@ -112,7 +112,8 @@ export function getPushHealthRecords(sinceHoursAgo = 24, limit = 50): PushHealth
           group by nj.launch_event_id
         ) latency on latency.launch_event_id = le.id
 
-        where le.event_time >= ?
+        -- Use UTC+8 to align SQLite datetime with BSC block times (UTC+8).
+        where datetime(le.event_time, '+08:00') >= datetime(?, '+08:00')
           and coalesce(eligible.eligible_count, 0) > 0
 
         order by le.event_time desc

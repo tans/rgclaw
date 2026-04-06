@@ -36,7 +36,8 @@ const FOUR_TOKEN_CREATE_TOPIC =
 
 const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const LOOKBACK_HOURS = 24;                 // how far back to check DB events
-const LOOKBACK_BLOCKS = 500;              // how many BSC blocks to scan for chain check
+const LOOKBACK_BLOCKS = 24_000;           // BSC ~3 blocks/s → ~2h of events (enough for CHAIN_LOOKBACK_HOURS)
+const CHAIN_LOOKBACK_HOURS = 2;            // how far back to fetch chain events (must match BSC blocks above)
 const COVERAGE_CRITICAL = 0.5;            // < 50% coverage = critical
 const COVERAGE_DEGRADED = 0.95;           // < 95% coverage = degraded
 const MAX_RECORDS_PER_CHECK = 100;
@@ -140,7 +141,7 @@ async function fetchChainEvents(
 // ─── Collector health: chain vs DB ─────────────────────────────────────────
 
 async function checkCollectorHealth(logger: { info(message: string): void; warn(message: string): void }): Promise<CollectorHealthResult> {
-  const since = new Date(Date.now() - 2 * 60 * 60 * 1000); // last 2 hours
+  const since = new Date(Date.now() - CHAIN_LOOKBACK_HOURS * 60 * 60 * 1000); // last N hours (matches LOOKBACK_BLOCKS)
 
   let chainEvents: ChainEvent[];
   try {
@@ -251,6 +252,46 @@ export type PushMonitorSummary = {
   collector_scanned: number;
   collector_missing: number;
 };
+
+// ─── Self-contained scheduled loop (used by PM2 ecosystem entry) ───────────
+
+const MONITOR_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+export async function runPushMonitorLoop({
+  intervalMs = MONITOR_INTERVAL_MS,
+  logger = console,
+}: {
+  intervalMs?: number;
+  logger?: { info(message: string): void; warn(message: string): void; error(message: string, err: unknown): void };
+} = {}) {
+  const loopLogger = {
+    info(msg: string) { logger.info(msg); },
+    warn(msg: string) { logger.warn(msg); },
+    error(msg: string, err: unknown) { logger.error(msg, err); },
+  };
+
+  // Run immediately on start, then on interval
+  await runPushMonitorCheck({ logger: loopLogger });
+
+  let count = 0;
+  while (true) {
+    await Bun.sleep(intervalMs);
+    count++;
+    try {
+      const summary = await runPushMonitorCheck({ logger: loopLogger });
+      loopLogger.info(
+        `[push-monitor] cycle #${count} complete — ` +
+          `records=${summary.records_checked} coverage=${Math.round(summary.overall_coverage * 100)}% ` +
+          `alerts=${summary.critical_alerts + summary.degraded_alerts} ` +
+          `collector=${summary.collector_ok ? "✓" : "✗"}(${summary.collector_scanned} evts)`,
+      );
+    } catch (err) {
+      loopLogger.error(`[push-monitor] cycle #${count} threw:`, err);
+    }
+  }
+}
+
+// ─── Core check logic (exported for both loop and one-shot use) ─────────────
 
 export async function runPushMonitorCheck(deps: {
   logger?: { info(message: string): void; warn(message: string): void; error(message: string, err: unknown): void };
