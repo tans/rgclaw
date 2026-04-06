@@ -53,24 +53,6 @@
       "time": true,
       "out_file": "logs/regouapp-worker.out.log",
       "error_file": "logs/regouapp-worker.err.log"
-    },
-    {
-      "name": "regouapp-push-monitor",
-      "namespace": "regouapp",
-      "cwd": "/root/regou-app",
-      "script": "src/workers/push-monitor.ts",
-      "interpreter": "/root/.bun/bin/bun",
-      "interpreterArgs": "run",
-      "env": {
-        "DATABASE_PATH": "./data/app.sqlite",
-        "BSC_RPC_URL": "https://public-bsc.nownodes.io/"
-      },
-      "autorestart": true,
-      "watch": false,
-      "merge_logs": true,
-      "time": true,
-      "out_file": "logs/regouapp-worker.out.log",
-      "error_file": "logs/regouapp-worker.err.log"
     }
   ]
 }

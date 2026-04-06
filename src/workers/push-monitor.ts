@@ -11,6 +11,7 @@
  * coverage drops below configured thresholds.
  */
 
+import { runMigrations } from "../db/migrate";
 import { config } from "../shared/config";
 import {
   getPushHealthRecords,
@@ -253,45 +254,6 @@ export type PushMonitorSummary = {
   collector_missing: number;
 };
 
-// ─── Self-contained scheduled loop (used by PM2 ecosystem entry) ───────────
-
-const MONITOR_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-
-export async function runPushMonitorLoop({
-  intervalMs = MONITOR_INTERVAL_MS,
-  logger = console,
-}: {
-  intervalMs?: number;
-  logger?: { info(message: string): void; warn(message: string): void; error(message: string, err: unknown): void };
-} = {}) {
-  const loopLogger = {
-    info(msg: string) { logger.info(msg); },
-    warn(msg: string) { logger.warn(msg); },
-    error(msg: string, err: unknown) { logger.error(msg, err); },
-  };
-
-  // Run immediately on start, then on interval
-  await runPushMonitorCheck({ logger: loopLogger });
-
-  let count = 0;
-  while (true) {
-    await Bun.sleep(intervalMs);
-    count++;
-    try {
-      const summary = await runPushMonitorCheck({ logger: loopLogger });
-      loopLogger.info(
-        `[push-monitor] cycle #${count} complete — ` +
-          `records=${summary.records_checked} coverage=${Math.round(summary.overall_coverage * 100)}% ` +
-          `alerts=${summary.critical_alerts + summary.degraded_alerts} ` +
-          `collector=${summary.collector_ok ? "✓" : "✗"}(${summary.collector_scanned} evts)`,
-      );
-    } catch (err) {
-      loopLogger.error(`[push-monitor] cycle #${count} threw:`, err);
-    }
-  }
-}
-
-// ─── Core check logic (exported for both loop and one-shot use) ─────────────
 
 export async function runPushMonitorCheck(deps: {
   logger?: { info(message: string): void; warn(message: string): void; error(message: string, err: unknown): void };
@@ -367,9 +329,15 @@ export async function runPushMonitorLoop(
   }
 }
 
+// ─── One-shot entry (used by run.ts, and can be run directly for local testing) ─
+
 if (import.meta.main) {
-  runPushMonitorLoop().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  runMigrations(process.env.DATABASE_PATH);
+  // Default: run once then exit (local testing / cron wrapper)
+  runPushMonitorCheck()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
 }
