@@ -79,6 +79,6 @@ export function buildRenewalReminder(expiresAt: string) {
     "立即续费，不中断推送：",
     "👉 regou.app/renew",
     "",
-    `套餐：月付 0.005 BNB，年付 0.045 BNB（省 25%）`,
+    `套餐：月付 0.02 BNB，季付 0.05 BNB，年付 0.1 BNB`,
   ].join("\n");
 }

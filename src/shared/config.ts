@@ -14,6 +14,10 @@ export const config = {
   bnbCollectionWallet: "0xaCEa067c6751083e4e652543A436638c1e777777",
   priceUnitWei: "5000000000000000",
   trialDays: 3,
+  // Pricing in wei
+  PRICE_PRO_MONTHLY_WEI: BigInt("20000000000000000"), // 0.02 BNB
+  PRICE_PRO_QUARTERLY_WEI: BigInt("50000000000000000"), // 0.05 BNB
+  PRICE_PRO_YEARLY_WEI: BigInt("100000000000000000"), // 0.1 BNB
   reminderLeadDays: 1,
   get wechatBotApiBaseUrl() {
     return process.env.WECHAT_BOT_API_BASE_URL ?? "https://example.invalid/wechat";

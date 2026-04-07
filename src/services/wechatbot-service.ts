@@ -105,12 +105,14 @@ function buildToggleResult(source: string, newState: boolean): string {
 
 async function buildPlansText(): Promise<string> {
   const bnbPrice = await fetchBnbPrice();
-  const monthlyUsd = bnbPrice != "暂时无法获取" ? `（约 $${(Number(bnbPrice.replace("$","").replace(" USDT","")) * 0.005).toFixed(2)}）` : "";
-  const yearlyUsd = bnbPrice != "暂时无法获取" ? `（约 $${(Number(bnbPrice.replace("$","").replace(" USDT","")) * 0.045).toFixed(2)}）` : "";
+  const monthlyUsd = bnbPrice != "暂时无法获取" ? `（约 $${(Number(bnbPrice.replace("$","").replace(" USDT","")) * 0.02).toFixed(2)}）` : "";
+  const quarterlyUsd = bnbPrice != "暂时无法获取" ? `（约 $${(Number(bnbPrice.replace("$","").replace(" USDT","")) * 0.05).toFixed(2)}）` : "";
+  const yearlyUsd = bnbPrice != "暂时无法获取" ? `（约 $${(Number(bnbPrice.replace("$","").replace(" USDT","")) * 0.1).toFixed(2)}）` : "";
   return `💳 Regou 套餐
 
-⭐ 年付 0.045 BNB${yearlyUsd}（365 天，省 25%）— 推荐
-月付 0.005 BNB${monthlyUsd}（30 天）
+⭐ 年付 0.1 BNB${yearlyUsd}（365 天）— 推荐
+季付 0.05 BNB${quarterlyUsd}（90 天）
+月付 0.02 BNB${monthlyUsd}（30 天）
 
 ✅ 付款后自动上链检测并续期，不中断推送
 
@@ -120,8 +122,9 @@ async function buildPlansText(): Promise<string> {
 function buildUpgradeText(): string {
   return `🚀 立即升级到专业版
 
-⭐ 年付 0.045 BNB（省 25%）— 推荐
-月付 0.005 BNB
+⭐ 年付 0.1 BNB（365 天）— 推荐
+季付 0.05 BNB（90 天）
+月付 0.02 BNB（30 天）
 
 前往续费：https://regou.app/renew
 
@@ -219,7 +222,7 @@ function makeMessageHandler(bot: any, binding: WechatBotBinding): (msg: any) => 
           const countdown = remainingDays > 0 ? remainingDays + " 天" : remainingHours > 0 ? remainingHours + " 小时" : "即将到期";
           const label = entitlement.plan_type === "trial" ? "试用" : "订阅";
           const isTrial = entitlement.plan_type === "trial";
-          const msgText = "⏰ " + label + "剩余时间：" + countdown + "\n\n" + (isTrial ? "试用到期后推送将中断，新的发射事件不再推送。\n\n立即升级，不中断推送体验：\n" : "当前订阅状态正常。\n") + "👉 regou.app/renew\n\n套餐：月付 0.005 BNB，年付 0.045 BNB（省 25%）";
+          const msgText = "⏰ " + label + "剩余时间：" + countdown + "\n\n" + (isTrial ? "试用到期后推送将中断，新的发射事件不再推送。\n\n立即升级，不中断推送体验：\n" : "当前订阅状态正常。\n") + "👉 regou.app/renew\n\n套餐：月付 0.02 BNB，季付 0.05 BNB，年付 0.1 BNB";
           await bot.reply(msg, msgText);
           return;
         }

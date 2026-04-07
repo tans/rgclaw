@@ -78,13 +78,18 @@ export function renderRenewalPage(props: {
     <div class="plans">
       <div class="plan">
         <div class="plan-name">月付</div>
-        <div class="plan-price">0.005 <span>BNB</span></div>
+        <div class="plan-price">0.02 <span>BNB</span></div>
         <div class="plan-unit">= 30 天</div>
+      </div>
+      <div class="plan">
+        <div class="plan-name">季付</div>
+        <div class="plan-price">0.05 <span>BNB</span></div>
+        <div class="plan-unit">= 90 天</div>
       </div>
       <div class="plan popular">
         <div class="plan-name">年付 · 推荐</div>
-        <div class="plan-price">0.045 <span>BNB</span></div>
-        <div class="plan-unit">= 365 天，省 25%</div>
+        <div class="plan-price">0.1 <span>BNB</span></div>
+        <div class="plan-unit">= 365 天</div>
       </div>
     </div>
 
@@ -104,7 +109,7 @@ export function renderRenewalPage(props: {
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <div class="step-text">从登记钱包向以上地址转账 0.005 BNB（30天）或 0.045 BNB（年付）</div>
+        <div class="step-text">从登记钱包向以上地址转账 0.02 BNB（月付）、0.05 BNB（季付）或 0.1 BNB（年付）</div>
       </div>
       <div class="step">
         <div class="step-num">3</div>

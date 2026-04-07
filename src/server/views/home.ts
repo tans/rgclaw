@@ -117,14 +117,20 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
     <div class="pricing-grid">
       <div class="plan">
         <div class="plan-name">月付</div>
-        <div class="plan-price">0.005 <span>BNB/月</span></div>
-        <div class="plan-desc">适合短期使用，自动续费</div>
+        <div class="plan-price">0.02 <span>BNB/月</span></div>
+        <div class="plan-desc">适合短期使用</div>
+        <a href="/auth/login" class="btn-primary">开始试用</a>
+      </div>
+      <div class="plan">
+        <div class="plan-name">季付</div>
+        <div class="plan-price">0.05 <span>BNB/季度</span></div>
+        <div class="plan-desc">90 天，平均每月 0.017 BNB</div>
         <a href="/auth/login" class="btn-primary">开始试用</a>
       </div>
       <div class="plan popular">
         <div class="plan-name">年付 · 推荐</div>
-        <div class="plan-price">0.045 <span>BNB/年</span></div>
-        <div class="plan-desc">相当于每月 0.00375 BNB，省 25%</div>
+        <div class="plan-price">0.1 <span>BNB/年</span></div>
+        <div class="plan-desc">365 天，平均每月 0.008 BNB</div>
         <a href="/auth/login" class="btn-primary">开始试用</a>
       </div>
     </div>
