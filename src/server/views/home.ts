@@ -14,7 +14,7 @@ function renderEventList(events: LaunchEventFeedItem[]) {
     });
     const displayName = event.symbol || event.token_address;
     return `<div class="event-item">
-      <div class="event-title">${displayName} 首发 DEX</div>
+      <div class="event-title">${displayName}</div>
       <div class="event-meta">
         <span class="event-source">${event.source === "four" ? "Four" : event.source === "flap" ? "Flap" : event.source}</span>
         <span class="event-time">${time}</span>

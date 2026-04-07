@@ -69,9 +69,9 @@ export function buildLaunchMessage(
     : null;
 
   const lines: string[] = [];
-  lines.push(`🔥 ${displayName} 首发 DEX！`);
+  lines.push(`🔥 ${displayName}！`);
   lines.push(`📡 来源：${sourceLabel}`);
-  if (timeStr) lines.push(`⏰ 发射：${timeStr}`);
+  if (timeStr) lines.push(`⏰ 时间：${timeStr}`);
   lines.push(``);
   lines.push(`📍 合约：${shortAddr}`);
   lines.push(`DexScreener：https://dexscreener.com/bsc/${tokenAddress}`);
