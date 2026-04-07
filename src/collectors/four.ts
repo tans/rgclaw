@@ -9,7 +9,7 @@ import {
 
 export const FOUR_CONTRACT_ADDRESS = "0x5c952063c7fc8610ffdb798152d69f0b9550762b";
 export const FOUR_TOKEN_CREATE_TOPIC =
-  "0xf2f3fa75816e73e0dabc4b7113147b6221e8f653c60044c9e07cfb47eb04dbeb"; // LiquidityAdded
+  "0x7db52723a3b2cdd6164364b3b766e65e540d7be48ffa89582956d8eaebe62942"; // TokenCreated (4-byte scanner top event)
 
 export type FourLaunchLog = {
   transactionHash: string;
