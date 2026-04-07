@@ -35,10 +35,11 @@ type ReminderRow = {
 };
 
 type LaunchContentRow = {
-  title: string;
+  title: string | null;
   token_address: string;
   source: string;
   symbol?: string | null;
+  event_time?: string | null;
 };
 
 export async function processLaunchPushes() {
@@ -160,7 +161,7 @@ function getLaunchContent(launchEventId: string) {
 
   try {
     return db
-      .query("select title, token_address, source, symbol from launch_events where id = ?")
+      .query("select title, token_address, source, symbol, event_time from launch_events where id = ?")
       .get(launchEventId) as LaunchContentRow | null;
   } finally {
     db.close();
@@ -223,7 +224,7 @@ export async function dispatchPendingNotificationMessages() {
       continue;
     }
 
-    const text = buildLaunchMessage(launch.token_address, launch.source, launch.symbol, launch.title);
+    const text = buildLaunchMessage(launch.token_address, launch.source, launch.symbol, launch.title, launch.event_time);
 
     const wechatBinding = findActiveBindingByUserId(job.user_id);
     if (!wechatBinding) {

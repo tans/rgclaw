@@ -12,8 +12,9 @@ function renderEventList(events: LaunchEventFeedItem[]) {
       hour: "2-digit",
       minute: "2-digit",
     });
+    const displayName = event.symbol || event.token_address;
     return `<div class="event-item">
-      <div class="event-title">${event.title}</div>
+      <div class="event-title">${displayName} 首发 DEX</div>
       <div class="event-meta">
         <span class="event-source">${event.source === "four" ? "Four" : event.source === "flap" ? "Flap" : event.source}</span>
         <span class="event-time">${time}</span>

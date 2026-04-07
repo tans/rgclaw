@@ -41,7 +41,7 @@ export function normalizeFourEvent(log: FourLaunchLog) {
     sourceEventId: `${log.transactionHash}:${log.logIndex}`,
     tokenAddress,
     symbol,
-    title: `${symbol ?? tokenAddress} 首发 DEX`,
+    title: symbol ?? null,
     eventTime: log.eventTime ?? new Date().toISOString(),
     chain: "bsc",
     rawPayload: JSON.stringify(log),

@@ -53,20 +53,32 @@ export async function sendWechatMessage(input: SendWechatMessageInput) {
   return { ok: true };
 }
 
-export function buildLaunchMessage(tokenAddress: string, source: string, symbol?: string | null, title?: string | null) {
+export function buildLaunchMessage(
+  tokenAddress: string,
+  source: string,
+  symbol?: string | null,
+  _title?: string | null,
+  eventTime?: string | null,
+) {
   const sourceLabel = source === "four" ? "Four" : source === "flap" ? "Flap" : source;
   const shortAddr = `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`;
   const displayName = symbol || shortAddr;
-  const headline = title ? `🔥 ${sourceLabel} 首发 DEX：${title}` : `🔥 ${sourceLabel} 首发 DEX！`;
-  return [
-    headline,
-    ``,
-    `代币: ${displayName}`,
-    `合约: ${shortAddr}`,
-    `DexScreener: https://dexscreener.com/bsc/${tokenAddress}`,
-    ``,
-    `第一时间掌握机会 👆`,
-  ].join("\n");
+
+  const timeStr = eventTime
+    ? new Date(eventTime).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false })
+    : null;
+
+  const lines: string[] = [];
+  lines.push(`🔥 ${displayName} 首发 DEX！`);
+  lines.push(`📡 来源：${sourceLabel}`);
+  if (timeStr) lines.push(`⏰ 发射：${timeStr}`);
+  lines.push(``);
+  lines.push(`📍 合约：${shortAddr}`);
+  lines.push(`DexScreener：https://dexscreener.com/bsc/${tokenAddress}`);
+  lines.push(``);
+  lines.push(`第一时间掌握机会 👆`);
+
+  return lines.join("\n");
 }
 
 export function buildRenewalReminder(expiresAt: string) {

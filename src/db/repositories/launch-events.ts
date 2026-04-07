@@ -5,7 +5,7 @@ export type LaunchEventFeedItem = {
   source: string;
   token_address: string;
   symbol: string | null;
-  title: string;
+  title: string | null;
   event_time: string;
 };
 
@@ -28,7 +28,7 @@ export type InsertLaunchEventInput = {
   sourceEventId: string;
   tokenAddress: string;
   symbol: string | null;
-  title: string;
+  title: string | null;
   eventTime: string;
   chain: string;
   rawPayload: string;
