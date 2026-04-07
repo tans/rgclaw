@@ -131,3 +131,55 @@ rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 
 Overall average: **60-90% token reduction** on common development operations.
 <!-- /rtk-instructions -->
+
+---
+
+## Harness: 全栈开发
+
+**目标:** 通过专业 Agent 团队协调后端、数据、集成 Agent，完成功能开发任务。
+
+**Agent 团队:**
+| Agent | 角色 |
+|-------|------|
+| fullstack-lead | 主编排，负责任务分解和团队协调 |
+| backend-dev | 后端开发 (Hono API、数据库、服务层) |
+| data-eng | 数据工程 (Collectors、Workers、链上数据) |
+| integration-dev | 集成开发 (微信机器人、外部 API) |
+
+**技能:**
+| 技能 | 用途 | 使用 Agent |
+|------|------|-----------|
+| fullstack-orchestrator | 全栈任务编排协调 | fullstack-lead |
+| backend-dev | Bun + Hono 后端开发 | backend-dev |
+| data-eng | 数据收集器、Workers | data-eng |
+| integration-dev | 微信、第三方集成 | integration-dev |
+
+**执行规则:**
+- 全栈开发任务请求时，使用 `fullstack-orchestrator` 技能通过 Agent 团队处理
+- 简单问题/确认可直接响应，无需启动团队
+- 所有 Agent 使用 `model: "opus"`
+- 中间产出: `_workspace/` 目录
+
+**目录结构:**
+```
+.claude/
+├── agents/
+│   ├── fullstack-lead.md
+│   ├── backend-dev.md
+│   ├── data-eng.md
+│   └── integration-dev.md
+└── skills/
+    ├── fullstack-orchestrator/
+    │   └── SKILL.md
+    ├── backend-dev/
+    │   └── SKILL.md
+    ├── data-eng/
+    │   └── SKILL.md
+    └── integration-dev/
+        └── SKILL.md
+```
+
+**更改日志:**
+| 日期 | 更改内容 | 对象 | 事由 |
+|------|---------|------|------|
+| 2026-04-07 | 初始配置 | 全部 | 全栈开发 Harness 建立 |
