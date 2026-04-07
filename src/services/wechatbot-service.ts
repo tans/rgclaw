@@ -133,7 +133,7 @@ function buildUpgradeText(): string {
 
 function buildHistoryText(userId: string): string {
   const events = listLatestLaunchEvents(5);
-  if (events.length === 0) return "暂无发射记录";
+  if (events.length === 0) return "暂无 DEX 首发记录";
   const subs = listSubscriptions(userId);
   const lines = events.map(ev => {
     const label = ev.source === "four" ? "Four" : ev.source === "flap" ? "Flap" : ev.source;
@@ -141,7 +141,7 @@ function buildHistoryText(userId: string): string {
     const shortAddr = `${ev.token_address.slice(0, 6)}...${ev.token_address.slice(-4)}`;
     return `🔥 ${label} — ${ev.title}\n代币: ${ev.symbol || shortAddr}\n合约: ${shortAddr}\nDexScreener: https://dexscreener.com/bsc/${ev.token_address}\n${time}`;
   });
-  return `📜 最近发射记录\n\n${lines.join("\n\n")}`;
+  return `📜 最近 DEX 首发记录\n\n${lines.join("\n\n")}`;
 }
 
 function buildUnknownCommand(cmd: string): string {

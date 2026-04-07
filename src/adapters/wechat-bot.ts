@@ -57,7 +57,7 @@ export function buildLaunchMessage(tokenAddress: string, source: string, symbol?
   const sourceLabel = source === "four" ? "Four" : source === "flap" ? "Flap" : source;
   const shortAddr = `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`;
   const displayName = symbol || shortAddr;
-  const headline = title ? `🔥 ${sourceLabel} 发射：${title}` : `🔥 ${sourceLabel} 发射！`;
+  const headline = title ? `🔥 ${sourceLabel} 首发 DEX：${title}` : `🔥 ${sourceLabel} 首发 DEX！`;
   return [
     headline,
     ``,
@@ -65,7 +65,7 @@ export function buildLaunchMessage(tokenAddress: string, source: string, symbol?
     `合约: ${shortAddr}`,
     `DexScreener: https://dexscreener.com/bsc/${tokenAddress}`,
     ``,
-    `第一时间掌握发射机会 👆`,
+    `第一时间掌握机会 👆`,
   ].join("\n");
 }
 

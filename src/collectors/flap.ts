@@ -35,7 +35,7 @@ export function normalizeFlapEvent(log: FlapLaunchLog) {
     sourceEventId: `${log.transactionHash}:${log.logIndex}`,
     tokenAddress,
     symbol,
-    title: `${symbol ?? tokenAddress} 发射`,
+    title: `${symbol ?? tokenAddress} 首发 DEX`,
     eventTime: log.eventTime ?? new Date().toISOString(),
     chain: "bsc",
     rawPayload: JSON.stringify(log),

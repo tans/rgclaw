@@ -156,7 +156,7 @@ export function buildEnrichedMessage(
 ): string {
   const lines: string[] = [];
 
-  lines.push(enriched.symbol ? `🔥 ${enriched.symbol} 发射啦！` : `🔥 新币发射！`);
+  lines.push(enriched.symbol ? `🔥 ${enriched.symbol} 首发 DEX！` : `🔥 新币首发 DEX！`);
 
   const srcLabel = source === "flap" ? "Flap" : source === "four" ? "4-byte" : source;
   lines.push(`📡 来源：${srcLabel}`);
