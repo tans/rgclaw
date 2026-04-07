@@ -118,15 +118,14 @@ async function buildPlansText(): Promise<string> {
 }
 
 function buildUpgradeText(): string {
-  return `🚀 立即升级
+  return `🚀 立即升级到专业版
 
-请打开：
-https://regou.app/renew
+⭐ 年付 0.045 BNB（省 25%）— 推荐
+月付 0.005 BNB
 
-你将获得：
-• Four / Flap 实时微信推送
-• 可持续不中断接收发射事件
-• 月付/年付灵活选择`;
+前往续费：https://regou.app/renew
+
+付款后自动上链检测并续期，不中断 Four / Flap 推送。`;
 }
 
 function buildHistoryText(userId: string): string {
