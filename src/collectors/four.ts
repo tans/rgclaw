@@ -8,8 +8,10 @@ import {
 } from "./rpc";
 
 export const FOUR_CONTRACT_ADDRESS = "0x5c952063c7fc8610ffdb798152d69f0b9550762b";
-export const FOUR_TOKEN_CREATE_TOPIC =
-  "0x7db52723a3b2cdd6164364b3b766e65e540d7be48ffa89582956d8eaebe62942"; // TokenCreated (4-byte scanner top event)
+// LiquidityAdded(address base, uint256 offers, address quote, uint256 funds)
+// Topic: keccak256("LiquidityAdded(address,uint256,address,uint256)")
+export const FOUR_LIQUIDITY_ADDED_TOPIC =
+  "0xc18aa71171b358b706fe3dd345299685ba21a5316c66ffa9e319268b033c44b0";
 
 export type FourLaunchLog = {
   transactionHash: string;
@@ -70,7 +72,7 @@ export async function collectFourLaunchEvents(
 ) {
   const logs = await getLogsInBatches(client, {
     address: FOUR_CONTRACT_ADDRESS,
-    topics: [FOUR_TOKEN_CREATE_TOPIC],
+    topics: [FOUR_LIQUIDITY_ADDED_TOPIC],
     fromBlock,
     toBlock,
     batchSize,
