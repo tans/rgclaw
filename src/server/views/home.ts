@@ -65,7 +65,8 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
   .event-source { background: rgba(7, 193, 96, 0.15); color: rgb(7, 193, 96); padding: 1px 6px; border-radius: 4px; }
   .event-address { font-size: 11px; color: #444; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pricing { padding: 60px 0; border-top: 1px solid rgba(255,255,255,0.06); }
-  .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 640px) { .pricing-grid { grid-template-columns: 1fr; } }
   .plan { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 24px; }
   .plan.popular { border-color: rgb(7, 193, 96); background: rgba(7, 193, 96, 0.08); }
   .plan-name { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #aaa; }
@@ -120,19 +121,19 @@ export function renderHomePage(events: LaunchEventFeedItem[]) {
         <div class="plan-name">月付</div>
         <div class="plan-price">0.02 <span>BNB/月</span></div>
         <div class="plan-desc">适合短期使用</div>
-        <a href="/auth/login" class="btn-primary">开始试用</a>
+        <a href="/auth/login" class="btn-primary">开通</a>
       </div>
       <div class="plan">
-        <div class="plan-name">季付</div>
+        <div class="plan-name">季度</div>
         <div class="plan-price">0.05 <span>BNB/季度</span></div>
         <div class="plan-desc">90 天，平均每月 0.017 BNB</div>
-        <a href="/auth/login" class="btn-primary">开始试用</a>
+        <a href="/auth/login" class="btn-primary">开通</a>
       </div>
       <div class="plan popular">
-        <div class="plan-name">年付 · 推荐</div>
+        <div class="plan-name">年度 · 推荐</div>
         <div class="plan-price">0.1 <span>BNB/年</span></div>
         <div class="plan-desc">365 天，平均每月 0.008 BNB</div>
-        <a href="/auth/login" class="btn-primary">开始试用</a>
+        <a href="/auth/login" class="btn-primary">开通</a>
       </div>
     </div>
   </section>

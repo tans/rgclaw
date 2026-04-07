@@ -98,7 +98,6 @@ export function renderRenewalPage(props: {
       <div class="address-row">
         <span class="address" id="payAddr">${config.bnbCollectionWallet}</span>
         <button id="copyBtn" class="copy-btn" title="复制地址">📋</button>
-        <a href="https://bscscan.com/address/${config.bnbCollectionWallet}" target="_blank" class="explorer-link" title="BscScan">🔗</a>
       </div>
     </div>
 
