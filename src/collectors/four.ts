@@ -20,10 +20,18 @@ export type FourLaunchLog = {
     token?: string;
     symbol?: string;
   };
+  topics?: string[];
 };
 
 export function normalizeFourEvent(log: FourLaunchLog) {
-  const tokenAddress = log.args.memeToken ?? log.args.token ?? "";
+  // BSC RPC may not decode ABI if it doesn't have the contract ABI cached.
+  // log.args.memeToken/log.args.token is only present when RPC successfully decodes the event.
+  // For indexed address parameters, the value is typically in topics[1].
+  const tokenAddress =
+    log.args.memeToken ??
+    log.args.token ??
+    parseAddressWordFromTopics(log.topics ?? [], 1) ??
+    "";
   const symbol = log.args.symbol ?? null;
 
   return {
@@ -37,6 +45,21 @@ export function normalizeFourEvent(log: FourLaunchLog) {
     rawPayload: JSON.stringify(log),
     dedupeKey: `four:${tokenAddress}`,
   };
+}
+
+/**
+ * Extract an address from topics array at the given index.
+ * Indexed address parameters are stored as topics[index] with 12 bytes padding.
+ */
+function parseAddressWordFromTopics(topics: string[], index: number): string | undefined {
+  if (index < topics.length) {
+    const topic = topics[index];
+    // Address is stored as 32 bytes with 12 zero bytes prefix
+    // e.g., "0x0000000000000000000000008731fd57abcb8ba055c073e4c1df1e5b62a987d4"
+    const addr = "0x" + topic.slice(26);
+    return addr.toLowerCase();
+  }
+  return undefined;
 }
 
 export async function collectFourLaunchEvents(
@@ -55,7 +78,13 @@ export async function collectFourLaunchEvents(
 
   return Promise.all(
     logs.map(async (log) => {
-      const tokenAddress = log.args?.memeToken ?? log.args?.token ?? parseAddressWord(log.data, 0);
+      // BSC RPC may not decode ABI if it doesn't have the contract ABI cached.
+      // Token is likely an indexed parameter, so check topics[1] first.
+      const tokenAddress =
+        log.args?.memeToken ??
+        log.args?.token ??
+        parseAddressWordFromTopics(log.topics ?? [], 1) ??
+        parseAddressWord(log.data, 1);
       const symbol = await resolveTokenSymbol(client, tokenAddress);
       const eventTime = await resolveEventTime(client, log);
 
