@@ -27,8 +27,7 @@ export type FlapLaunchLog = {
 export function normalizeFlapEvent(log: FlapLaunchLog) {
   // BSC RPC may not decode ABI if it doesn't have the contract ABI cached.
   // log.args.token is only present when RPC successfully decodes the event.
-  // For FLAP LaunchedToDEX, token is NOT indexed, so it appears in data word 1.
-  // If args.token is missing, we still need to parse from data in the calling function.
+  // For FLAP LaunchedToDEX, token is NOT indexed — appears in data word 0 (parsed by caller).
   const tokenAddress = log.args?.token ?? "";
   const symbol = log.args?.symbol ?? null;
 
@@ -81,11 +80,11 @@ export async function collectFlapLaunchEvents(
   return Promise.all(
     logs.map(async (log) => {
       // BSC RPC may not decode ABI if it doesn't have the contract ABI cached.
-      // Token is an indexed parameter, so it appears in topics[1], not in data.
+      // LaunchedToDEX has NO indexed params — token is in data word 0.
       const tokenAddress =
         log.args?.token ??
         parseAddressWordFromTopics(log.topics ?? [], 1) ??
-        parseAddressWord(log.data, 1);
+        parseAddressWord(log.data, 0);
       const symbol = await resolveTokenSymbol(client, tokenAddress);
       const eventTime = await resolveEventTime(client, log);
 
