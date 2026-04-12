@@ -189,6 +189,7 @@ export async function getLogsInBatches(
   input: {
     address: string;
     topics?: string[];
+    event?: { type: string; inputs: readonly unknown[] };
     fromBlock: bigint;
     toBlock: bigint;
     batchSize: bigint;
@@ -196,12 +197,23 @@ export async function getLogsInBatches(
 ) {
   const logs: RpcLog[] = [];
 
+  // If event is provided, extract topics from it
+  let topics = input.topics;
+  if (input.event && !topics) {
+    // Import viem's encodeEventTopics to get the event signature
+    const { encodeEventTopics } = await import("viem");
+    const encodedTopics = encodeEventTopics({
+      abi: [input.event],
+    });
+    topics = encodedTopics as string[];
+  }
+
   for (let start = input.fromBlock; start <= input.toBlock; start += input.batchSize) {
     const end =
       start + input.batchSize - 1n > input.toBlock ? input.toBlock : start + input.batchSize - 1n;
     const batch = await client.getLogs({
       address: input.address,
-      topics: input.topics,
+      topics,
       fromBlock: start,
       toBlock: end,
     });

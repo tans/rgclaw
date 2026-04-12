@@ -2,7 +2,7 @@
 # push-monitor.sh — 纯 bash + sqlite3，无 bun 依赖
 # 每 10 分钟由 cron 调用一次，写入推送健康记录 & 告警
 
-set -uo pipefail  # 移除 -e，改用显式错误检查
+set -euo pipefail
 
 APP_DIR="/root/regou-app"
 DATA_DB="$APP_DIR/data/app.sqlite"
@@ -45,32 +45,6 @@ FLAP_TOPIC0="0xa890c1bae7f73a9e"   # first 8 bytes of TokenCreated sig
 FOUR_TOPIC0="0x0c7c9a8d"           # first 4 bytes of TokenCreated sig
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
-safe_python() {
-  python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    $1
-    print(result if 'result' in dir() else '')
-except Exception as e:
-    print('ERROR:' + str(e), file=sys.stderr)
-    sys.exit(1)
-" 2>/dev/null
-}
-
-rpc_call() {
-  local method="$1"
-  local params="$2"
-  local tmpfile="/tmp/pm_rpc_$$"
-  echo '{"jsonrpc":"2.0","method":"'"$method"'","params":'"$params"',"id":1}' > "$tmpfile"
-  local result
-  result=$(curl -s --noproxy '*' -m 10 -X POST "$BSC_RPC_URL" \
-    -H "Content-Type: application/json" \
-    -d @"$tmpfile" 2>/dev/null)
-  rm -f "$tmpfile"
-  echo "$result"
-}
-
 sql() { sqlite3 -json "$DATA_DB" "$1" 2>/dev/null || echo "[]"; }
 sql_one() { sqlite3 "$DATA_DB" "$1" 2>/dev/null; }
 
@@ -130,58 +104,47 @@ db_four=$(sql_one "$DB_FOUR_SQL")
 get_chain_events() {
   local contract="$1"
   local topic0="$2"
+  local method="eth_getLogs"
 
-  # Get latest block via rpc_call helper
-  local block_resp latest_hex
-  block_resp=$(rpc_call "eth_blockNumber" "[]")
-  latest_hex=$(echo "$block_resp" | python3 -c "
-import sys,json
-try:
-    d=json.load(sys.stdin)
-    print(d.get('result',''))
-except:
-    print('')
-" 2>/dev/null)
+  # Get latest block
+  local latest_hex
+  latest_hex=$(curl -s -m 5 -X POST "$BSC_RPC_URL" \
+    -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('result',''))" 2>/dev/null || echo "")
 
-  if [ -z "$latest_hex" ] || [ "$latest_hex" = "" ]; then
+  if [ -z "$latest_hex" ]; then
     echo "0"
     return
   fi
 
-  # Calculate from_block = latest - lookback
-  local from_hex to_hex resp result_count
-  to_hex="$latest_hex"
-  from_hex=$(echo "$latest_hex" | python3 -c "
-import sys
-try:
-    h=sys.stdin.read().strip()
-    if h and h.startswith('0x'):
-        n=int(h,16)
-        lookback=${CHAIN_LOOKBACK_BLOCKS}
-        f=max(n-lookback,0)
-        print(hex(f))
-    else:
-        print('0x0')
-except:
-    print('0x0')
-" 2>/dev/null)
+  # Convert hex to int and subtract lookback
+  local latest decimal from_block
+  latest=$(python3 -c "print(int('$latest_hex', 16))" 2>/dev/null || echo "0")
+  from_block=$(python3 -c "print(max($latest - $CHAIN_LOOKBACK_BLOCKS, 0))" 2>/dev/null || echo "0")
 
-  # Query eth_getLogs - use smaller range to avoid rate limits
-  local logs_resp
-  logs_resp=$(rpc_call "eth_getLogs" "[{\"fromBlock\":\"$from_hex\",\"toBlock\":\"$to_hex\",\"address\":\"$contract\",\"topics\":[\"$topic0\"]}]")
-  
-  result_count=$(echo "$logs_resp" | python3 -c "
-import sys,json
-try:
-    d=json.load(sys.stdin)
-    if 'error' in d:
-        print('0')
-    else:
-        print(len(d.get('result',[])))
-except:
-    print('0')
-" 2>/dev/null)
-  echo "${result_count:-0}"
+  local from_hex to_hex
+  from_hex=$(python3 -c "print(hex($from_block))" 2>/dev/null || echo "0x0")
+  to_hex="$latest_hex"
+
+  local response
+  response=$(curl -s -m 15 -X POST "$BSC_RPC_URL" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"jsonrpc\":\"2.0\",
+      \"method\":\"$method\",
+      \"params\":[{
+        \"fromBlock\":\"$from_hex\",
+        \"toBlock\":\"$to_hex\",
+        \"address\":\"$contract\",
+        \"topics\":[\"$topic0\"]
+      }],
+      \"id\":1
+    }" 2>/dev/null || echo '{"result":null}')
+
+  local result
+  result=$(python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('result',[])))" 2>/dev/null || echo "0")
+  echo "${result:-0}"
 }
 
 chain_flap=$(get_chain_events "$FLAP_CONTRACT" "$FLAP_TOPIC0")
@@ -214,17 +177,8 @@ else
 fi
 
 # ── F. Determine alert level ─────────────────────────────────────────────────
-# Determine why no jobs were created
-NO_JOBS_BUT_EVENTS=0
-if [ "${events_checked:-0}" = "0" ] && { [ "$db_flap" -gt 0 ] || [ "$db_four" -gt 0 ]; }; then
-  NO_JOBS_BUT_EVENTS=1
-fi
-
 ALERT_LEVEL="ok"
-if [ "$NO_JOBS_BUT_EVENTS" = "1" ]; then
-  # Collector is working but processLaunchPushes is not creating jobs
-  ALERT_LEVEL="critical"
-elif [ "$overall_cov" != "null" ] && [ "$(python3 -c "print($overall_cov < 0.5 and $total_eligible > 0)" 2>/dev/null)" = "True" ]; then
+if [ "$overall_cov" != "null" ] && [ "$(python3 -c "print($overall_cov < 0.5 and $total_eligible > 0)" 2>/dev/null)" = "True" ]; then
   ALERT_LEVEL="critical"
 elif [ "$overall_cov" != "null" ] && [ "$(python3 -c "print($overall_cov < 0.95 and $total_eligible > 0)" 2>/dev/null)" = "True" ]; then
   ALERT_LEVEL="degraded"

@@ -6,6 +6,7 @@ import { createBscRpcClient } from "./rpc";
 import { collectFlapLaunchEvents } from "./flap";
 import { collectFourLaunchEvents } from "./four";
 import { runBackfillOnce, type BackfillOptions } from "./backfill";
+import { appendFileSync } from "fs";
 
 const COLLECTOR_POLL_DELAY_MS = 30_000;
 
@@ -86,9 +87,30 @@ export async function runCollectorLoop({
   });
 }
 
-if (import.meta.main) {
-  runCollectorLoop().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
-}
+// Direct execution (no import.meta.main check, like web server)
+const logFile = "./logs/collector-direct.log";
+const log = (msg: string) => {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try {
+    appendFileSync(logFile, line);
+  } catch (e) {
+    // Ignore file write errors
+  }
+  console.log(msg);
+};
+
+log("collector starting...");
+log(`BSC_RPC_URL: ${config.bscRpcUrl}`);
+log(`DATABASE_PATH: ${config.databasePath}`);
+log(`COLLECTOR_LOOKBACK_BLOCKS: ${config.collectorLookbackBlocks}`);
+log(`SKIP_BACKFILL: ${process.env.SKIP_BACKFILL}`);
+
+runCollectorLoop({
+  logger: {
+    info: (msg) => log(`INFO: ${msg}`),
+    error: (msg, err) => log(`ERROR: ${msg} - ${err}`),
+  },
+}).catch((error) => {
+  log(`FATAL ERROR: ${error}`);
+  process.exit(1);
+});

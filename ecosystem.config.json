@@ -25,10 +25,11 @@
       "cwd": "/root/regou-app",
       "script": "src/collectors/run.ts",
       "interpreter": "/root/.bun/bin/bun",
-      "interpreterArgs": "run",
+      "interpreterArgs": "",
       "env": {
         "BSC_RPC_URL": "https://public-bsc.nownodes.io/",
         "DATABASE_PATH": "./data/app.sqlite",
+        "COLLECTOR_LOOKBACK_BLOCKS": "10000",
         "SKIP_BACKFILL": "true"
       },
       "autorestart": true,

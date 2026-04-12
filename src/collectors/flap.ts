@@ -1,67 +1,18 @@
+import { decodeEventLog, parseAbi } from "viem";
 import type { CollectorClient } from "./client";
 import {
   getLogsInBatches,
-  parseAddressWord,
   resolveEventTime,
   resolveTokenSymbol,
   toLogIndex,
 } from "./rpc";
 
 export const FLAP_PORTAL_ADDRESS = "0xe2ce6ab80874fa9fa2aae65d277dd6b8e65c9de0";
+
 // LaunchedToDEX(address token, address pool, uint256 amount, uint256 eth)
-// Topic: keccak256("LaunchedToDEX(address,address,uint256,uint256)")
-export const FLAP_LAUNCHED_TOPIC =
-  "0x6e4f47630b8745b8cacbd44f42a8a33e7eea7cc08ef22fc7630f4f385784ff7d";
-
-export type FlapLaunchLog = {
-  transactionHash: string;
-  logIndex: number;
-  eventTime?: string;
-  args: {
-    token?: string;
-    symbol?: string;
-  };
-  topics?: string[];
-};
-
-export function normalizeFlapEvent(log: FlapLaunchLog) {
-  // BSC RPC may not decode ABI if it doesn't have the contract ABI cached.
-  // log.args.token is only present when RPC successfully decodes the event.
-  // For FLAP LaunchedToDEX, token is NOT indexed — appears in data word 0 (parsed by caller).
-  const tokenAddress = log.args?.token ?? "";
-  const symbol = log.args?.symbol ?? null;
-
-  return {
-    source: "flap",
-    sourceEventId: `${log.transactionHash}:${log.logIndex}`,
-    tokenAddress,
-    symbol,
-    title: symbol ?? null,
-    eventTime: log.eventTime ?? new Date().toISOString(),
-    chain: "bsc",
-    rawPayload: JSON.stringify(log),
-    dedupeKey: `flap:${tokenAddress}`,
-  };
-}
-
-/**
- * Extract an address from topics array at the given index.
- * Indexed address parameters are stored as topics[index] with 12 bytes padding.
- * Returns undefined if the topic doesn't exist or can't be parsed.
- */
-function parseAddressWordFromTopics(topics: string[] | undefined, index: number): string | undefined {
-  if (!topics || index >= topics.length) {
-    return undefined;
-  }
-  const topic = topics[index];
-  if (!topic || topic === "0x" || topic.length < 26) {
-    return undefined;
-  }
-  // Address is stored as 32 bytes with 12 zero bytes prefix
-  // e.g., "0x0000000000000000000000008731fd57abcb8ba055c073e4c1df1e5b62a987d4"
-  const addr = "0x" + topic.slice(26);
-  return addr.toLowerCase();
-}
+const flapAbi = parseAbi([
+  "event LaunchedToDEX(address token, address pool, uint256 amount, uint256 eth)",
+]);
 
 export async function collectFlapLaunchEvents(
   client: Pick<CollectorClient, "getLogs" | "getBlock" | "readContract">,
@@ -71,7 +22,7 @@ export async function collectFlapLaunchEvents(
 ) {
   const logs = await getLogsInBatches(client, {
     address: FLAP_PORTAL_ADDRESS,
-    topics: [FLAP_LAUNCHED_TOPIC],
+    event: flapAbi[0],
     fromBlock,
     toBlock,
     batchSize,
@@ -79,24 +30,36 @@ export async function collectFlapLaunchEvents(
 
   return Promise.all(
     logs.map(async (log) => {
-      // BSC RPC may not decode ABI if it doesn't have the contract ABI cached.
-      // LaunchedToDEX has NO indexed params — token is in data word 0.
-      const tokenAddress =
-        log.args?.token ??
-        parseAddressWordFromTopics(log.topics ?? [], 1) ??
-        parseAddressWord(log.data, 0);
+      const decoded = decodeEventLog({
+        abi: flapAbi,
+        data: log.data,
+        topics: log.topics,
+      });
+
+      const tokenAddress = decoded.args.token.toLowerCase();
       const symbol = await resolveTokenSymbol(client, tokenAddress);
       const eventTime = await resolveEventTime(client, log);
 
-      return normalizeFlapEvent({
-        transactionHash: log.transactionHash,
-        logIndex: toLogIndex(log.logIndex),
-        eventTime,
-        args: {
-          token: tokenAddress,
-          symbol: symbol ?? undefined,
-        },
-      });
+      return {
+        source: "flap",
+        sourceEventId: `${log.transactionHash}:${log.logIndex}`,
+        tokenAddress,
+        symbol,
+        title: symbol ?? null,
+        eventTime: eventTime ?? new Date().toISOString(),
+        chain: "bsc",
+        rawPayload: JSON.stringify({
+          transactionHash: log.transactionHash,
+          logIndex: toLogIndex(log.logIndex),
+          args: {
+            token: decoded.args.token,
+            pool: decoded.args.pool,
+            amount: decoded.args.amount.toString(),
+            eth: decoded.args.eth.toString(),
+          },
+        }),
+        dedupeKey: `flap:${log.transactionHash}:${log.logIndex}`,
+      };
     }),
   );
 }
