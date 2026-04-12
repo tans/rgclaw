@@ -60,10 +60,17 @@ function decodeAbiString(hex: string) {
   return Buffer.from(data, "hex").toString("utf8");
 }
 
-async function jsonRpc<Result>(url: string, method: string, params: unknown[]) {
+async function jsonRpc<Result>(
+  urls: string[],
+  method: string,
+  params: unknown[],
+) {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    // Round-robin across available RPC endpoints
+    const url = urls[attempt % urls.length];
+
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -78,6 +85,15 @@ async function jsonRpc<Result>(url: string, method: string, params: unknown[]) {
         }),
       });
 
+      if (response.status === 429) {
+        // Respect Retry-After header if present, otherwise use exponential backoff
+        const retryAfter = response.headers.get("Retry-After");
+        const sleepMs = retryAfter
+          ? Number(retryAfter) * 1000
+          : 500 * Math.pow(2, attempt);
+        throw new Error(`rpc rate limited: 429, retry-after=${retryAfter ?? "none"}`);
+      }
+
       if (!response.ok) {
         throw new Error(`rpc request failed: ${response.status}`);
       }
@@ -91,21 +107,36 @@ async function jsonRpc<Result>(url: string, method: string, params: unknown[]) {
       return payload.result;
     } catch (error) {
       lastError = error;
-      await Bun.sleep(150 * (attempt + 1));
+      // Longer backoff on 429 to respect rate limits
+      const sleepMs = String(error).includes("rate limited")
+        ? 500 * Math.pow(2, attempt)
+        : 150 * (attempt + 1);
+      await Bun.sleep(sleepMs);
     }
   }
 
   throw lastError;
 }
 
-export function createBscRpcClient(url: string): RpcClient {
+const DEFAULT_RPC_URLS = [
+  "https://public-bsc.nownodes.io/",
+  "https://bsc-rpc.publicnode.com",
+];
+
+export function createBscRpcClient(urls?: string | string[]): RpcClient {
+  const rpcUrls = Array.isArray(urls)
+    ? urls
+    : urls
+    ? [urls]
+    : DEFAULT_RPC_URLS;
+
   return {
     async getBlockNumber() {
-      const result = await jsonRpc<string>(url, "eth_blockNumber", []);
+      const result = await jsonRpc<string>(rpcUrls, "eth_blockNumber", []);
       return BigInt(result);
     },
     async getLogs(input) {
-      return jsonRpc<RpcLog[]>(url, "eth_getLogs", [
+      return jsonRpc<RpcLog[]>(rpcUrls, "eth_getLogs", [
         {
           address: input.address,
           topics: input.topics,
@@ -115,7 +146,7 @@ export function createBscRpcClient(url: string): RpcClient {
       ]);
     },
     async getBlock(input) {
-      const result = await jsonRpc<{ timestamp: string }>(url, "eth_getBlockByNumber", [
+      const result = await jsonRpc<{ timestamp: string }>(rpcUrls, "eth_getBlockByNumber", [
         `0x${input.blockNumber.toString(16)}`,
         false,
       ]);
@@ -125,7 +156,7 @@ export function createBscRpcClient(url: string): RpcClient {
       };
     },
     async readContract(input) {
-      const result = await jsonRpc<string>(url, "eth_call", [
+      const result = await jsonRpc<string>(rpcUrls, "eth_call", [
         {
           to: input.address,
           data: "0x95d89b41",
